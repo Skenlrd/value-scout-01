@@ -13,6 +13,10 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ["Inter", "sans-serif"],
+        pixel: ["Press Start 2P", "cursive"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -46,6 +50,12 @@ export default {
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
+        },
+        brand: {
+          value: "hsl(var(--brand-value))",
+          scout: "hsl(var(--brand-scout))",
+          sage: "hsl(var(--brand-sage))",
+          grey: "hsl(var(--brand-grey))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",

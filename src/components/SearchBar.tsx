@@ -2,8 +2,20 @@ import { useState } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
-const SearchBar = () => {
+interface SearchBarProps {
+  onSearch?: (query: string) => void;
+}
+
+const SearchBar = ({ onSearch }: SearchBarProps = {}) => {
   const [isTyping, setIsTyping] = useState(false);
+  const [query, setQuery] = useState("");
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setQuery(value);
+    setIsTyping(value.trim().length > 0);
+    onSearch?.(value);
+  };
 
   return (
     <div
@@ -17,7 +29,8 @@ const SearchBar = () => {
           type="search"
           placeholder="Search for deals, styles, and more..."
           className="w-full h-full pl-14 pr-6 bg-transparent border-none text-lg font-medium focus-visible:ring-0 focus-visible:ring-offset-0"
-          onInput={(e) => setIsTyping((e.target as HTMLInputElement).value.trim().length > 0)}
+          value={query}
+          onChange={handleChange}
         />
       </form>
     </div>

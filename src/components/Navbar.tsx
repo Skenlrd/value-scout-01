@@ -11,8 +11,7 @@ const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
 
   const navLinks = [
-    { label: "NEW IN", href: "#new" },
-    { label: "COMPARE DEALS", href: "#compare" },
+    { label: "COMPARE DEALS", href: "/compare" },
     { label: "AI STYLE BUILDER", href: "#style" },
     { label: "SEARCH BY CATEGORY", href: "#category" },
   ];

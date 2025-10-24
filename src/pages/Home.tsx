@@ -1,10 +1,11 @@
-import BrandLogo from "@/components/BrandLogo";
-import Navbar from "@/components/Navbar";
-import SearchBar from "@/components/SearchBar";
-import ProductCard from "@/components/ProductCard";
-import DealCard from "@/components/DealCard";
-import WishlistCard from "@/components/WishlistCard";
-import heroImage from "@/assets/hero-image.jpg";
+import BrandLogo from "../components/BrandLogo";
+import Navbar from "../components/Navbar";
+import SearchBar from "../components/SearchBar";
+import ProductCard from "../components/ProductCard";
+import DealCard from "../components/DealCard";
+import WishlistCard from "../components/WishlistCard";
+// Import the video file
+import heroVideo from "../assets/video1.mp4";
 
 const Home = () => {
   return (
@@ -19,16 +20,21 @@ const Home = () => {
 
       {/* Hero Section with Search */}
       <section className="relative h-[60vh] max-h-[500px] overflow-hidden">
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{
-            backgroundImage: `url(${heroImage})`,
-            filter: "brightness(0.8)",
-          }}
-        />
-        
+        {/* Video Background */}
+        <video
+          autoPlay
+          loop
+          muted
+          className="absolute inset-0 w-full h-full object-cover z-0"
+          style={{ filter: "brightness(0.8)" }}
+        >
+          {/* Use the imported video variable here */}
+          <source src={heroVideo} type="video/mp4" />
+          Your browser does not support the video tag.
+        </video>
+
         {/* Search Overlay */}
-        <div className="absolute inset-0 flex items-center justify-center px-4">
+        <div className="absolute inset-0 flex items-center justify-center px-4 z-10">
           <SearchBar />
         </div>
       </section>
@@ -38,8 +44,9 @@ const Home = () => {
         <div className="text-center max-w-2xl mx-auto mb-16">
           <h2 className="text-3xl font-bold mb-4">Discover Your Perfect Style</h2>
           <p className="text-muted-foreground text-lg">
-            Compare deals, build your AI-powered wardrobe, and shop smarter with ValueScout.
-          </p>
+            Compare deals, build your AI-powered wardrobe, and shop smarter with
+            ValueScout.
+          </p> {/* Corrected closing tag */}
         </div>
 
         {/* Top Trending Deals Section */}
@@ -57,24 +64,24 @@ const Home = () => {
         <section className="mb-16">
           <h2 className="text-2xl font-bold mb-6">Lowest This Month</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <DealCard 
-              name="Running Shoes Elite" 
-              currentPrice="$89" 
+            <DealCard
+              name="Running Shoes Elite"
+              currentPrice="$89"
               priceDrop="$40 off"
             />
-            <DealCard 
-              name="Casual Denim Jacket" 
-              currentPrice="$59" 
+            <DealCard
+              name="Casual Denim Jacket"
+              currentPrice="$59"
               priceDrop="$30 off"
             />
-            <DealCard 
-              name="Fitness Tracker Band" 
-              currentPrice="$45" 
+            <DealCard
+              name="Fitness Tracker Band"
+              currentPrice="$45"
               priceDrop="$25 off"
             />
-            <DealCard 
-              name="Winter Coat Premium" 
-              currentPrice="$119" 
+            <DealCard
+              name="Winter Coat Premium"
+              currentPrice="$119"
               priceDrop="$50 off"
             />
           </div>
@@ -82,7 +89,9 @@ const Home = () => {
 
         {/* Wishlist Section */}
         <section>
-          <h2 className="text-2xl font-bold mb-6">Your Wishlist - Price Alerts</h2>
+          <h2 className="text-2xl font-bold mb-6">
+            Your Wishlist - Price Alerts
+          </h2>
           <div className="overflow-x-auto pb-4">
             <div className="flex gap-4">
               <WishlistCard
@@ -119,3 +128,4 @@ const Home = () => {
 };
 
 export default Home;
+

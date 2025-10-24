@@ -1,242 +1,170 @@
 # scraper.py
-from pymongo import MongoClient
-from datetime import datetime
-import requests
-from bs4 import BeautifulSoup
 import time
+import sys
+from pymongo import MongoClient
+from datetime import datetime, timezone
+from bs4 import BeautifulSoup
+
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
 
 # Connect to MongoDB
 client = MongoClient('mongodb://localhost:27017/')
 db = client['value_scout']
 products_collection = db['products']
 
-# User-Agent to avoid blocking
-HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-}
+PRODUCT_LIMIT = 10 
 
-def categorize_product(name):
-    """Determine category from product name"""
-    name_lower = name.lower()
-    if any(word in name_lower for word in ['shoe', 'sneaker', 'boot', 'jordan', 'air force', 'dunk']):
-        return 'shoes'
-    elif any(word in name_lower for word in ['jean', 'pant', 'trouser', 'jogger']):
-        return 'pants'
-    elif any(word in name_lower for word in ['tshirt', 't-shirt', 'tee', 'polo']):
-        return 'tshirt'
-    elif any(word in name_lower for word in ['shirt', 'hoodie', 'sweatshirt']):
-        return 'shirt'
-    elif any(word in name_lower for word in ['jacket', 'coat', 'bomber']):
-        return 'jacket'
-    elif any(word in name_lower for word in ['sock']):
-        return 'socks'
-    return 'other'
+def setup_driver():
+    """Sets up the Selenium WebDriver automatically."""
+    print("Setting up Selenium WebDriver for Brave...")
+    options = Options()
+    
+    options.binary_location = r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe"
+    
+    options.add_argument("--headless")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--window-size=1920,1080")
+    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+    
+    service = Service()
+    driver = webdriver.Chrome(service=service, options=options)
+    
+    print("✓ WebDriver is ready.")
+    return driver
 
-def extract_brand(name):
-    """Extract brand from product name"""
-    brands = ['Nike', 'Adidas', 'Puma', 'Reebok', 'New Balance', 'Converse', 'Vans', 'Jordan']
-    for brand in brands:
-        if brand.lower() in name.lower():
-            return brand
-    return 'Unknown'
+def scrape_myntra_selenium(scrape_url, category):
+    driver = setup_driver()
+    scraped_products = []
+    
+    try:
+        print(f"Attempting to scrape: {scrape_url}")
+        driver.get(scrape_url)
+        
+        wait = WebDriverWait(driver, 20)
+        product_list_container = wait.until(
+            EC.presence_of_element_located((By.CLASS_NAME, "results-base"))
+        )
+        print("✓ Product page loaded.")
 
-def scrape_myntra():
-    """Scrape Nike and Adidas products from Myntra"""
-    print("\n🛍️  Scraping Myntra...")
-    
-    # NOTE: These are placeholder URLs and selectors
-    # Real implementation would need actual product listing URLs
-    search_urls = [
-        "https://www.myntra.com/nike?rawQuery=nike",
-        "https://www.myntra.com/adidas?rawQuery=adidas"
-    ]
-    
-    products = []
-    
-    # MOCK DATA - Replace with actual scraping when running
-    mock_products = [
-        {
-            "_id": "myntra_nike_001",
-            "productName": "Nike Air Force 1 '07",
-            "brand": "Nike",
-            "category": "shoes",
-            "price": "₹8,995",
-            "imageUrl": "https://images.unsplash.com/photo-1549298916-b41d501d3772",
-            "productUrl": "https://www.myntra.com/casual-shoes/nike/nike-men-white-air-force-1-07-sneakers/1234567",
-            "source": "Myntra"
-        },
-        {
-            "_id": "myntra_adidas_001",
-            "productName": "Adidas Originals Superstar",
-            "brand": "Adidas",
-            "category": "shoes",
-            "price": "₹7,999",
-            "imageUrl": "https://images.unsplash.com/photo-1600185365926-3a2ce3cdb9eb",
-            "productUrl": "https://www.myntra.com/casual-shoes/adidas/adidas-originals-men-white-superstar-sneakers/2345678",
-            "source": "Myntra"
-        },
-        {
-            "_id": "myntra_nike_002",
-            "productName": "Nike Dri-FIT T-shirt",
-            "brand": "Nike",
-            "category": "tshirt",
-            "price": "₹1,495",
-            "imageUrl": "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab",
-            "productUrl": "https://www.myntra.com/tshirts/nike/nike-men-black-dri-fit-tshirt/3456789",
-            "source": "Myntra"
-        }
-    ]
-    
-    # TODO: Implement actual scraping
-    # for url in search_urls:
-    #     try:
-    #         response = requests.get(url, headers=HEADERS, timeout=10)
-    #         soup = BeautifulSoup(response.content, 'html.parser')
-    #         
-    #         # Example selectors (these will need to be updated based on actual site structure)
-    #         product_cards = soup.select('.product-base')
-    #         
-    #         for card in product_cards[:20]:  # Limit to 20 products per search
-    #             try:
-    #                 name = card.select_one('.product-product').text.strip()
-    #                 price = card.select_one('.product-discountedPrice').text.strip()
-    #                 image = card.select_one('img')['src']
-    #                 link = "https://www.myntra.com" + card.select_one('a')['href']
-    #                 
-    #                 product_id = link.split('/')[-1]
-    #                 
-    #                 products.append({
-    #                     "_id": f"myntra_{product_id}",
-    #                     "productName": name,
-    #                     "brand": extract_brand(name),
-    #                     "category": categorize_product(name),
-    #                     "price": price,
-    #                     "imageUrl": image,
-    #                     "productUrl": link,
-    #                     "source": "Myntra"
-    #                 })
-    #             except Exception as e:
-    #                 continue
-    #         
-    #         time.sleep(2)  # Be respectful
-    #     except Exception as e:
-    #         print(f"Error scraping Myntra: {e}")
-    
-    return mock_products
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight / 2);")
+        time.sleep(2) 
 
-def scrape_superkicks():
-    """Scrape Nike and Adidas sneakers from Superkicks"""
-    print("\n👟 Scraping Superkicks...")
-    
-    # MOCK DATA
-    mock_products = [
-        {
-            "_id": "superkicks_001",
-            "productName": "Nike Air Jordan 1 Retro High",
-            "brand": "Nike",
-            "category": "shoes",
-            "price": "₹12,995",
-            "imageUrl": "https://images.unsplash.com/photo-1556906781-9a412961c28c",
-            "productUrl": "https://www.superkicks.in/product/nike-air-jordan-1-retro-high",
-            "source": "Superkicks"
-        },
-        {
-            "_id": "superkicks_002",
-            "productName": "Adidas Yeezy Boost 350 V2",
-            "brand": "Adidas",
-            "category": "shoes",
-            "price": "₹19,999",
-            "imageUrl": "https://images.unsplash.com/photo-1600269452121-4f2416e55c28",
-            "productUrl": "https://www.superkicks.in/product/adidas-yeezy-boost-350",
-            "source": "Superkicks"
-        }
-    ]
-    
-    # TODO: Implement actual scraping
-    # base_url = "https://www.superkicks.in"
-    # search_urls = [
-    #     f"{base_url}/collections/nike",
-    #     f"{base_url}/collections/adidas"
-    # ]
-    
-    return mock_products
+        html_content = driver.page_source
+        soup = BeautifulSoup(html_content, 'html.parser')
+        
+        products = soup.find_all('li', class_='product-base')
+        
+        if not products:
+            print("✗ No product cards found. Myntra's class names might have changed.")
+            return []
 
-def scrape_vegnonveg():
-    """Scrape Nike and Adidas products from VegNonVeg"""
-    print("\n🔥 Scraping VegNonVeg...")
-    
-    # MOCK DATA
-    mock_products = [
-        {
-            "_id": "vegnonveg_001",
-            "productName": "Nike SB Dunk Low Pro",
-            "brand": "Nike",
-            "category": "shoes",
-            "price": "₹9,995",
-            "imageUrl": "https://images.unsplash.com/photo-1608231387042-66d1773070a5",
-            "productUrl": "https://www.vegnonveg.com/product/nike-sb-dunk-low-pro",
-            "source": "VegNonVeg"
-        },
-        {
-            "_id": "vegnonveg_002",
-            "productName": "Adidas Samba Classic",
-            "brand": "Adidas",
-            "category": "shoes",
-            "price": "₹8,499",
-            "imageUrl": "https://images.unsplash.com/photo-1552346154-21d32810aba3",
-            "productUrl": "https://www.vegnonveg.com/product/adidas-samba-classic",
-            "source": "VegNonVeg"
-        }
-    ]
-    
-    # TODO: Implement actual scraping
-    # base_url = "https://www.vegnonveg.com"
-    
-    return mock_products
+        print(f"✓ Found {len(products)} product cards. Processing up to {PRODUCT_LIMIT}...")
 
-def save_products(products):
-    """Save products to MongoDB"""
-    count = 0
+        for product in products:
+            if len(scraped_products) >= PRODUCT_LIMIT:
+                print(f"Reached product limit of {PRODUCT_LIMIT}.")
+                break
+            
+            # --- NEW ROBUST LINK FINDING ---
+            # Find the product name, then find its parent link
+            name_tag = product.find('h4', class_='product-product')
+            if not name_tag:
+                 print("Skipping card, cannot find product name tag.")
+                 continue
+                 
+            product_link_tag = name_tag.find_parent('a')
+            if not product_link_tag:
+                print("Skipping card, cannot find parent link tag for name.")
+                continue
+                
+            product_link_href = product_link_tag.get('href')
+            if not product_link_href:
+                print("Skipping card, link tag has no href.")
+                continue
+            # --- END NEW LINK FINDING ---
+
+            brand = product.find('h3', class_='product-brand')
+            price_element = product.find('span', class_='product-discountedPrice')
+            if not price_element:
+                price_element = product.find('div', class_='product-price')
+            
+            image = product.find('img')
+            image_url = None
+            if image:
+                image_url = image.get('data-src')
+                if not image_url:
+                    image_url = image.get('src')
+            
+            if not all([brand, price_element, image_url]):
+                print("Skipping a card, missing brand, price, or image.")
+                continue
+
+            brand_text = brand.get_text().strip()
+            name_text = name_tag.get_text().strip()
+            price_text = price_element.get_text().strip().replace('Rs. ', '₹')
+            
+            # Use the new href variable
+            product_url = "https://www.myntra.com" + product_link_href
+            product_id_slug = product_link_href.split('/')[-1]
+            product_id = f"myntra_{product_id_slug}"
+            
+            scraped_products.append({
+                "_id": product_id,
+                "productName": f"{brand_text} - {name_text}",
+                "price": price_text,
+                "imageUrl": image_url,
+                "productUrl": product_url,
+                "source": "Myntra",
+                "brand": brand_text,
+                "category": category
+            })
+            
+        return scraped_products
+
+    except Exception as e:
+        print(f"✗ An unexpected error occurred during scraping: {e}")
+        return []
+    finally:
+        driver.quit()
+
+def main():
+    if len(sys.argv) != 3:
+        print("Error: You must provide a URL slug and a category name.")
+        print("Example: py scraper.py nike-sneakers shoes")
+        print("Example: py scraper.py nike-tshirts tshirts")
+        return
+
+    url_slug = sys.argv[1]
+    category = sys.argv[2]
+    scrape_url = f"https://www.myntra.com/{url_slug}"
+
+    print(f"--- Starting Selenium Scraper for category: {category} ---")
+    
+    products = scrape_myntra_selenium(scrape_url, category)
+    
+    if not products:
+        print("Scraping failed or found no products. Exiting.")
+        return
+
     for product in products:
-        product['scrapedAt'] = datetime.utcnow()
+        product['scrapedAt'] = datetime.now(timezone.utc)
         
         result = products_collection.update_one(
             {'_id': product['_id']},
             {
                 '$set': product,
-                '$unset': {'styleEmbedding': ''}  # Remove old embedding for reprocessing
+                '$unset': {'styleEmbedding': ''}
             },
             upsert=True
         )
-        
-        if result.upserted_id:
-            print(f"  ✓ Inserted: {product['productName']} ({product['source']})")
-        else:
-            print(f"  ✓ Updated: {product['productName']} ({product['source']})")
-        count += 1
     
-    return count
-
-def main():
-    print("=" * 60)
-    print("🚀 ValueScout Product Scraper")
-    print("=" * 60)
-    
-    all_products = []
-    
-    # Scrape all sources
-    all_products.extend(scrape_myntra())
-    all_products.extend(scrape_superkicks())
-    all_products.extend(scrape_vegnonveg())
-    
-    # Save to database
-    print(f"\n💾 Saving {len(all_products)} products to MongoDB...")
-    count = save_products(all_products)
-    
-    print("\n" + "=" * 60)
-    print(f"✅ Scraping complete! Processed {count} products.")
-    print("=" * 60)
-    print("\n💡 Next step: Run 'python process_embeddings.py' to generate AI embeddings")
+    print(f"\n--- Scraping complete! Processed {len(products)} {category}. ---")
 
 if __name__ == "__main__":
     main()

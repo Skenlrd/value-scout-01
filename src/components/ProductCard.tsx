@@ -2,14 +2,17 @@ import { useState, useEffect } from "react";
 import { Card, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Wand2 } from "lucide-react";
+import { Wand2, ExternalLink } from "lucide-react";
 
 interface ProductCardProps {
+  productId: string;
   name: string;
   price: string;
   image?: string;
-  productId: string;
+  productUrl?: string;
+  source?: string;
 }
 
 interface Product {
@@ -146,24 +149,45 @@ const AIStyleBuilderModalContent = ({ baseProductId }: { baseProductId: string }
 };
 
 // Main ProductCard Component
-const ProductCard = ({ name, price, image, productId }: ProductCardProps) => {
+const ProductCard = ({ productId, name, price, image, productUrl, source }: ProductCardProps) => {
   return (
     <Dialog>
-      <Card className="bg-card border border-border rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
-        <div className="aspect-square bg-muted flex items-center justify-center">
-          {image ? (
-            <img src={image} alt={name} className="w-full h-full object-cover" />
-          ) : (
-            <div className="text-muted-foreground text-sm">No Image</div>
+      <Card className="bg-card border border-border rounded-lg overflow-hidden hover:shadow-lg transition-shadow group">
+        <a 
+          href={productUrl || '#'} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="block"
+        >
+          <div className="aspect-square bg-muted flex items-center justify-center relative overflow-hidden">
+            {image ? (
+              <img 
+                src={image} 
+                alt={name} 
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+              />
+            ) : (
+              <div className="text-muted-foreground text-sm">No Image</div>
+            )}
+            {productUrl && (
+              <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                <ExternalLink className="w-4 h-4 text-foreground" />
+              </div>
+            )}
+          </div>
+        </a>
+        <div className="p-4 space-y-2">
+          {source && (
+            <Badge variant="secondary" className="text-xs">
+              {source}
+            </Badge>
           )}
-        </div>
-        <div className="p-4">
-          <h3 className="font-medium text-foreground mb-2 line-clamp-2">{name}</h3>
+          <h3 className="font-medium text-foreground line-clamp-2 min-h-[3rem]">{name}</h3>
           <p className="text-lg font-bold text-brand-scout">{price}</p>
         </div>
         <CardFooter className="pt-0 px-4 pb-4">
           <DialogTrigger asChild>
-            <Button variant="outline" size="sm" className="w-full gap-2">
+            <Button variant="outline" size="sm" className="w-full gap-2" onClick={(e) => e.preventDefault()}>
               <Wand2 className="w-4 h-4" />
               AI Style
             </Button>

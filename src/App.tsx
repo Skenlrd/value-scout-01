@@ -34,6 +34,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Auth from "./pages/Auth";
 import Home from "./pages/Home";
 import Compare from "./pages/Compare";
+import StyleBuilderSearchPage from "./pages/StyleBuilderSearchPage";
 import NotFound from "./pages/NotFound";
 
 export default function App() {
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/compare" element={<Compare />} />
+        <Route path="/style-builder" element={<StyleBuilderSearchPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Router>

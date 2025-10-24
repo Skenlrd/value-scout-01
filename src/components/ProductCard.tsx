@@ -1,205 +1,54 @@
-import { useState, useEffect } from "react";
-import { Card, CardFooter } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Wand2, ExternalLink } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Wand2 } from "lucide-react";
+import { Dialog, DialogTrigger, DialogContent } from "../ui/Dialog"; // adjust import path if your Dialog is elsewhere
+import { Badge } from "../ui/Badge"; // adjust import path
+import { Button } from "../ui/Button"; // adjust import path
+import { Card, CardFooter } from "../ui/Card"; // adjust import path
+import { Skeleton } from "../components/Skeleton"; // adjust import path for Skeleton if needed
 
 interface ProductCardProps {
   productId: string;
-  name: string;
-  price: string;
-  image?: string;
-  productUrl?: string;
-  source?: string;
-}
-
-interface Product {
-  _id: string;
   productName: string;
-  price: string;
+  price?: number;
   imageUrl?: string;
   productUrl?: string;
   source?: string;
 }
 
-interface Recommendation {
-  id: string;
-  score: number;
-}
-
-// AI Style Builder Modal Content Component
-const AIStyleBuilderModalContent = ({ baseProductId }: { baseProductId: string }) => {
-  const [recommendations, setRecommendations] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchRecommendations = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        // Step 1: Get AI recommendations from Python API
-        const aiResponse = await fetch(`http://localhost:5000/api/style-builder/${baseProductId}`);
-        
-        if (!aiResponse.ok) {
-          throw new Error(`AI API error: ${aiResponse.statusText}`);
-        }
-
-        const aiData = await aiResponse.json();
-        const recommendedIds: Recommendation[] = aiData.recommendations || [];
-
-        if (recommendedIds.length === 0) {
-          setRecommendations([]);
-          setIsLoading(false);
-          return;
-        }
-
-        // Step 2: Get full product details from Node.js API
-        const ids = recommendedIds.map(r => r.id).join(',');
-        const productsResponse = await fetch(`http://localhost:8080/api/products-by-ids?ids=${ids}`);
-        
-        if (!productsResponse.ok) {
-          throw new Error(`Products API error: ${productsResponse.statusText}`);
-        }
-
-        const productsData: Product[] = await productsResponse.json();
-        setRecommendations(productsData);
-
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load recommendations');
-        console.error('Error fetching recommendations:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchRecommendations();
-  }, [baseProductId]);
-
-  if (isLoading) {
-    return (
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
-        {[1, 2, 3, 4, 5, 6].map((i) => (
-          <div key={i} className="space-y-2">
-            <Skeleton className="aspect-square w-full" />
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-4 w-1/2" />
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-destructive">Error: {error}</p>
-        <p className="text-muted-foreground text-sm mt-2">
-          Make sure your Python AI API (port 5000) and Node.js API (port 8080) are running.
-        </p>
-      </div>
-    );
-  }
-
-  if (recommendations.length === 0) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-muted-foreground">No matching items found for this product.</p>
-      </div>
-    );
-  }
+const ProductCard: React.FC<ProductCardProps> = ({ productId, productName, price, imageUrl, productUrl, source }) => {
+  const [open, setOpen] = useState(false);
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
-      {recommendations.map((product) => (
-        <a
-          key={product._id}
-          href={product.productUrl || '#'}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="group"
-        >
-          <Card className="overflow-hidden hover:shadow-lg transition-shadow">
-            <div className="aspect-square bg-muted flex items-center justify-center">
-              {product.imageUrl ? (
-                <img
-                  src={product.imageUrl}
-                  alt={product.productName}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                />
+    <Dialog open={open} onOpenChange={setOpen}>
+      <div>
+        <Card style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+          <a href={productUrl} target="_blank" rel="noreferrer" style={{ textDecoration: "none", color: "inherit" }}>
+            <div style={{ width: "100%", height: 220, backgroundColor: "#f3f3f3", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {imageUrl ? (
+                <img src={imageUrl} alt={productName} style={{ maxWidth: "100%", maxHeight: "100%" }} />
               ) : (
-                <div className="text-muted-foreground text-sm">No Image</div>
+                <Skeleton height={220} />
               )}
             </div>
-            <div className="p-3">
-              <h4 className="font-medium text-sm line-clamp-2 mb-1">{product.productName}</h4>
-              <p className="text-brand-scout font-bold">{product.price}</p>
-              {product.source && (
-                <p className="text-xs text-muted-foreground mt-1">{product.source}</p>
-              )}
+            <div style={{ padding: 12 }}>
+              <div style={{ fontWeight: 600 }}>{productName}</div>
+              <div style={{ color: "#666", marginTop: 6 }}>{price ? `₹${price}` : ""}</div>
             </div>
-          </Card>
-        </a>
-      ))}
-    </div>
-  );
-};
+          </a>
 
-// Main ProductCard Component
-const ProductCard = ({ productId, name, price, image, productUrl, source }: ProductCardProps) => {
-  return (
-    <Dialog>
-      <Card className="bg-card border border-border rounded-lg overflow-hidden hover:shadow-lg transition-shadow group">
-        <a 
-          href={productUrl || '#'} 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="block"
-        >
-          <div className="aspect-square bg-muted flex items-center justify-center relative overflow-hidden">
-            {image ? (
-              <img 
-                src={image} 
-                alt={name} 
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
-              />
-            ) : (
-              <div className="text-muted-foreground text-sm">No Image</div>
-            )}
-            {productUrl && (
-              <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                <ExternalLink className="w-4 h-4 text-foreground" />
-              </div>
-            )}
-          </div>
-        </a>
-        <div className="p-4 space-y-2">
-          {source && (
-            <Badge variant="secondary" className="text-xs">
-              {source}
-            </Badge>
-          )}
-          <h3 className="font-medium text-foreground line-clamp-2 min-h-[3rem]">{name}</h3>
-          <p className="text-lg font-bold text-brand-scout">{price}</p>
-        </div>
-        <CardFooter className="pt-0 px-4 pb-4">
-          <DialogTrigger asChild>
-            <Button variant="outline" size="sm" className="w-full gap-2" onClick={(e) => e.preventDefault()}>
-              <Wand2 className="w-4 h-4" />
-              AI Style
-            </Button>
-          </DialogTrigger>
-        </CardFooter>
-      </Card>
+          <CardFooter style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 12 }}>
+            <Badge>{source || "Unknown"}</Badge>
 
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-        <DialogTitle>AI Style Recommendations</DialogTitle>
-        <DialogDescription>
-          Items that match perfectly with <strong>{name}</strong>
-        </DialogDescription>
+            <DialogTrigger asChild>
+              <Button aria-label="AI Style Builder" title="Build outfit suggestions">
+                <Wand2 />
+              </Button>
+            </DialogTrigger>
+          </CardFooter>
+        </Card>
+      </div>
+
+      <DialogContent>
         <AIStyleBuilderModalContent baseProductId={productId} />
       </DialogContent>
     </Dialog>
@@ -207,3 +56,101 @@ const ProductCard = ({ productId, name, price, image, productUrl, source }: Prod
 };
 
 export default ProductCard;
+
+/**
+ * Modal content that performs the two-API-call flow:
+ * 1) Python AI API to get recommended product ids
+ * 2) Node Main API to fetch product details by ids
+ */
+interface AIStyleBuilderModalContentProps {
+  baseProductId: string;
+}
+
+const AIStyleBuilderModalContent: React.FC<AIStyleBuilderModalContentProps> = ({ baseProductId }) => {
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [recommendedProducts, setRecommendedProducts] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchRecommendations = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        // Call 1: Python AI API
+        const resp1 = await fetch(`http://localhost:5000/api/style-builder/${encodeURIComponent(baseProductId)}`);
+        if (!resp1.ok) {
+          throw new Error(`AI API returned ${resp1.status}`);
+        }
+        const recs = await resp1.json(); // expected: [{id: "...", score: 0.9}, ...]
+        const ids = (recs || []).map((r: any) => r.id).filter(Boolean);
+        if (ids.length === 0) {
+          if (!cancelled) {
+            setRecommendedProducts([]);
+            setIsLoading(false);
+          }
+          return;
+        }
+
+        // Call 2: Node Main API to fetch product details
+        const idsParam = ids.map(encodeURIComponent).join(",");
+        const resp2 = await fetch(`http://localhost:8080/api/products-by-ids?ids=${idsParam}`);
+        if (!resp2.ok) {
+          throw new Error(`Main API returned ${resp2.status}`);
+        }
+        const products = await resp2.json();
+        if (!cancelled) {
+          setRecommendedProducts(products || []);
+          setIsLoading(false);
+        }
+      } catch (err: any) {
+        console.error("Failed to load recommendations", err);
+        if (!cancelled) {
+          setError(String(err));
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchRecommendations();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [baseProductId]);
+
+  return (
+    <div style={{ padding: 16, minWidth: 320 }}>
+      <h3>AI Style Suggestions</h3>
+      {isLoading ? (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i}>
+              <Skeleton height={140} />
+              <Skeleton height={16} style={{ marginTop: 8 }} />
+            </div>
+          ))}
+        </div>
+      ) : error ? (
+        <div style={{ color: "red" }}>Error: {error}</div>
+      ) : recommendedProducts.length === 0 ? (
+        <div>No recommendations found.</div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
+          {recommendedProducts.map((p) => (
+            <div key={p._id} style={{ border: "1px solid #eee", padding: 8, borderRadius: 6 }}>
+              <a href={p.productUrl} target="_blank" rel="noreferrer" style={{ textDecoration: "none", color: "inherit" }}>
+                <div style={{ width: "100%", height: 140, display: "flex", alignItems: "center", justifyContent: "center", background: "#fafafa" }}>
+                  {p.imageUrl ? <img src={p.imageUrl} alt={p.productName} style={{ maxWidth: "100%", maxHeight: "100%" }} /> : <Skeleton height={140} />}
+                </div>
+                <div style={{ marginTop: 8, fontWeight: 600 }}>{p.productName}</div>
+                <div style={{ marginTop: 4, color: "#666" }}>{p.price ? `₹${p.price}` : ""}</div>
+              </a>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};

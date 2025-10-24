@@ -1,148 +1,146 @@
-import sys
+#!/usr/bin/env python3
+"""
+Offline scraper placeholder.
+
+- Connects to MongoDB value_scout.products
+- Provides placeholder scrape_* functions
+- Inserts/updates a set of mock products and ensures styleEmbedding is removed ($unset)
+"""
+
+import datetime
+import pymongo
 import requests
-from bs4 import BeautifulSoup
-from pymongo import MongoClient
-from pymongo.server_api import ServerApi
-from datetime import datetime
-import os
-from dotenv import load_dotenv
+from bs4 import BeautifulSoup  # placeholder for future scraping
 
-# Load environment variables from .env file
-load_dotenv()
-
-# Configuration
-MONGODB_URI = os.getenv(
-    "MONGODB_URI", "mongodb://localhost:27017/"
-)  # Use environment variable or default
+MONGO_URI = "mongodb://localhost:27017"
 DB_NAME = "value_scout"
 COLLECTION_NAME = "products"
-SITE_NAME = "myntra"
-PRODUCT_LIMIT = 10  # Limit the number of products to scrape per run
 
-# MongoDB Connection
-try:
-    client = MongoClient(MONGODB_URI, server_api=ServerApi("1"))
+def get_db_collection():
+    client = pymongo.MongoClient(MONGO_URI)
     db = client[DB_NAME]
-    collection = db[COLLECTION_NAME]
-    # Send a ping to confirm a successful connection
-    client.admin.command("ping")
-    print("Pinged your deployment. You successfully connected to MongoDB!")
-except Exception as e:
-    print(f"Error connecting to MongoDB: {e}")
-    sys.exit(1)
+    return db[COLLECTION_NAME]
 
+def scrape_myntra():
+    # placeholder scraping logic for Myntra
+    # return list of dict product documents if implemented
+    return []
 
-def scrape_myntra(url_slug, category_name):
-    """
-    Scrapes product data from a Myntra category page.
-    """
-    url = f"https://www.myntra.com/{url_slug}"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
+def scrape_superkicks():
+    # placeholder scraping logic for Superkicks
+    return []
 
-    try:
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching URL {url}: {e}")
-        return
+def scrape_vegnonveg():
+    # placeholder scraping logic for VegNonVeg
+    return []
 
-    soup = BeautifulSoup(response.content, "html.parser")
-    products = soup.find_all("li", class_="product-base")
+def make_mock_products():
+    now = datetime.datetime.utcnow().isoformat() + "Z"
+    return [
+        {
+            "_id": "myntra_001",
+            "productName": "Nike Air Zoom Pegasus - Men's Running Shoes",
+            "brand": "Nike",
+            "category": "shoes",
+            "price": 9999,
+            "imageUrl": "https://example.com/images/nike_pegasus.jpg",
+            "productUrl": "https://www.myntra.com/nike/pegasus",
+            "source": "Myntra",
+            "scrapedAt": now,
+        },
+        {
+            "_id": "superkicks_001",
+            "productName": "Adidas UltraBoost Running Shoes",
+            "brand": "Adidas",
+            "category": "shoes",
+            "price": 11999,
+            "imageUrl": "https://example.com/images/adidas_ultraboost.jpg",
+            "productUrl": "https://www.superkicks.com/adidas/ultraboost",
+            "source": "Superkicks",
+            "scrapedAt": now,
+        },
+        {
+            "_id": "vegnonveg_001",
+            "productName": "VegNonVeg Classic Tee",
+            "brand": "VegNonVeg",
+            "category": "tshirt",
+            "price": 699,
+            "imageUrl": "https://example.com/images/vnv_tee.jpg",
+            "productUrl": "https://www.vegnonveg.com/classic-tee",
+            "source": "VegNonVeg",
+            "scrapedAt": now,
+        },
+        {
+            "_id": "myntra_002",
+            "productName": "Adidas Essentials Track Pants",
+            "brand": "Adidas",
+            "category": "pants",
+            "price": 2499,
+            "imageUrl": "https://example.com/images/adidas_pants.jpg",
+            "productUrl": "https://www.myntra.com/adidas/track-pants",
+            "source": "Myntra",
+            "scrapedAt": now,
+        },
+        {
+            "_id": "superkicks_002",
+            "productName": "Puma Casual Sneakers",
+            "brand": "Puma",
+            "category": "shoes",
+            "price": 4999,
+            "imageUrl": "https://example.com/images/puma_sneakers.jpg",
+            "productUrl": "https://www.superkicks.com/puma/casual-sneakers",
+            "source": "Superkicks",
+            "scrapedAt": now,
+        },
+        {
+            "_id": "vegnonveg_002",
+            "productName": "VegNonVeg Bomber Jacket",
+            "brand": "VegNonVeg",
+            "category": "jacket",
+            "price": 3999,
+            "imageUrl": "https://example.com/images/vnv_jacket.jpg",
+            "productUrl": "https://www.vegnonveg.com/bomber-jacket",
+            "source": "VegNonVeg",
+            "scrapedAt": now,
+        },
+    ]
 
-    if not products:
-        print(f"No products found on {url}. Check selector or page structure.")
-        return
-
-    print(f"Found {len(products)} products. Processing first {PRODUCT_LIMIT}...")
-
-    for product in products[:PRODUCT_LIMIT]:
-        product_link_tag = product.find("a")
-        product_link = (
-            product_link_tag["href"] if product_link_tag else None
-        )
-
-        product_brand_tag = product.find("h3", class_="product-brand")
-        product_brand = (
-            product_brand_tag.get_text(strip=True) if product_brand_tag else "N/A"
-        )
-
-        product_name_tag = product.find("h4", class_="product-product")
-        product_name = (
-            product_name_tag.get_text(strip=True) if product_name_tag else "N/A"
-        )
-
-        product_price_tag = product.find("span", class_="product-discountedPrice")
-        if not product_price_tag:
-            product_price_tag = product.find(
-                "div", class_="product-price"
-            )  # Fallback
-        
-        product_price = "N/A"
-        if product_price_tag:
-            price_text = product_price_tag.get_text(strip=True)
-            # Clean price text (e.g., "Rs. 1234")
-            product_price = price_text.replace("Rs.", "").strip()
-
-
-        image_tag = product.find("img", class_="img-responsive")
-        image_url = image_tag["src"] if image_tag and "src" in image_tag.attrs else None
-        
-        # --- FIX IS HERE ---
-        product_id = None  # Start with None instead of "buy"
-        if product_link:
-            try:
-                # Extract the last part of the URL path
-                product_id = product_link.split("/")[-1]
-                
-                # Ensure product_id is not empty or a default value
-                if not product_id or product_id == "buy":
-                    print(f"Parsed invalid product_id '{product_id}' from link: {product_link}")
-                    product_id = None
-            except Exception as e:
-                print(f"Error parsing product link {product_link}: {e}")
-                product_id = None
-        
-        # If we couldn't get a unique ID, skip this product
-        if not product_id:
-            print(f"Could not find a unique product ID. Skipping product: {product_name} ({product_brand})")
-            continue  # Skip to the next product
-        
-        # --- END OF FIX ---
-
-        product_data = {
-            "name": product_name,
-            "brand": product_brand,
-            "price": product_price,
-            "product_link": product_link,
-            "image_url": image_url,
-            "category": category_name,  # Add category
-            "site": SITE_NAME,
-            "scraped_at": datetime.utcnow(),
+def upsert_products(products_collection, products):
+    for p in products:
+        # Remove any existing styleEmbedding so downstream processor will recompute embeddings
+        update_doc = {
+            "$set": {
+                "productName": p.get("productName"),
+                "brand": p.get("brand"),
+                "category": p.get("category"),
+                "price": p.get("price"),
+                "imageUrl": p.get("imageUrl"),
+                "productUrl": p.get("productUrl"),
+                "source": p.get("source"),
+                "scrapedAt": p.get("scrapedAt"),
+            },
+            "$unset": {"styleEmbedding": ""},  # crucial: drop existing embedding
         }
+        result = products_collection.update_one({"_id": p["_id"]}, update_doc, upsert=True)
+        print(f"Upserted {_id_summary(p['_id'])}, matched={{result.matched_count}}, modified={{result.modified_count}}")
 
-        try:
-            # Use update_one with upsert=True to insert or update the product
-            # The _id will now be unique (e.g., "myntra_12345")
-            collection.update_one(
-                {"_id": f"{SITE_NAME}_{product_id}"},
-                {"$set": product_data},
-                upsert=True,
-            )
-            print(f"Upserted product: {SITE_NAME}_{product_id}")
-        except Exception as e:
-            print(f"Error upserting product {SITE_NAME}_{product_id} to MongoDB: {e}")
+def _id_summary(_id):
+    return f"{_id}"
 
+def main():
+    products_collection = get_db_collection()
+
+    # collect mocked products
+    mock_products = make_mock_products()
+
+    # placeholders for actual scrape functions - left intentionally but unused for offline run
+    # myntra_products = scrape_myntra()
+    # superkicks_products = scrape_superkicks()
+    # vegnonveg_products = scrape_vegnonveg()
+
+    # For offline usage, use the mock list
+    upsert_products(products_collection, mock_products)
+    print("Finished upserting mock products.")
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("Usage: python scraper.py <url_slug> <category_name>")
-        print("Example: python scraper.py nike-tshirts tshirts")
-        sys.exit(1)
-
-    url_slug_to_scrape = sys.argv[1]
-    category_name_to_assign = sys.argv[2]
-    scrape_myntra(url_slug_to_scrape, category_name_to_assign)
-
-    print("Scraping complete.")
+    main()

@@ -1,170 +1,148 @@
-# scraper.py
-import time
 import sys
-from pymongo import MongoClient
-from datetime import datetime, timezone
+import requests
 from bs4 import BeautifulSoup
+from pymongo import MongoClient
+from pymongo.server_api import ServerApi
+from datetime import datetime
+import os
+from dotenv import load_dotenv
 
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
+# Load environment variables from .env file
+load_dotenv()
 
-# Connect to MongoDB
-client = MongoClient('mongodb://localhost:27017/')
-db = client['value_scout']
-products_collection = db['products']
+# Configuration
+MONGODB_URI = os.getenv(
+    "MONGODB_URI", "mongodb://localhost:27017/"
+)  # Use environment variable or default
+DB_NAME = "value_scout"
+COLLECTION_NAME = "products"
+SITE_NAME = "myntra"
+PRODUCT_LIMIT = 10  # Limit the number of products to scrape per run
 
-PRODUCT_LIMIT = 10 
+# MongoDB Connection
+try:
+    client = MongoClient(MONGODB_URI, server_api=ServerApi("1"))
+    db = client[DB_NAME]
+    collection = db[COLLECTION_NAME]
+    # Send a ping to confirm a successful connection
+    client.admin.command("ping")
+    print("Pinged your deployment. You successfully connected to MongoDB!")
+except Exception as e:
+    print(f"Error connecting to MongoDB: {e}")
+    sys.exit(1)
 
-def setup_driver():
-    """Sets up the Selenium WebDriver automatically."""
-    print("Setting up Selenium WebDriver for Brave...")
-    options = Options()
-    
-    options.binary_location = r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe"
-    
-    options.add_argument("--headless")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--window-size=1920,1080")
-    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-    
-    service = Service()
-    driver = webdriver.Chrome(service=service, options=options)
-    
-    print("✓ WebDriver is ready.")
-    return driver
 
-def scrape_myntra_selenium(scrape_url, category):
-    driver = setup_driver()
-    scraped_products = []
-    
+def scrape_myntra(url_slug, category_name):
+    """
+    Scrapes product data from a Myntra category page.
+    """
+    url = f"https://www.myntra.com/{url_slug}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+
     try:
-        print(f"Attempting to scrape: {scrape_url}")
-        driver.get(scrape_url)
-        
-        wait = WebDriverWait(driver, 20)
-        product_list_container = wait.until(
-            EC.presence_of_element_located((By.CLASS_NAME, "results-base"))
-        )
-        print("✓ Product page loaded.")
-
-        driver.execute_script("window.scrollTo(0, document.body.scrollHeight / 2);")
-        time.sleep(2) 
-
-        html_content = driver.page_source
-        soup = BeautifulSoup(html_content, 'html.parser')
-        
-        products = soup.find_all('li', class_='product-base')
-        
-        if not products:
-            print("✗ No product cards found. Myntra's class names might have changed.")
-            return []
-
-        print(f"✓ Found {len(products)} product cards. Processing up to {PRODUCT_LIMIT}...")
-
-        for product in products:
-            if len(scraped_products) >= PRODUCT_LIMIT:
-                print(f"Reached product limit of {PRODUCT_LIMIT}.")
-                break
-            
-            # --- NEW ROBUST LINK FINDING ---
-            # Find the product name, then find its parent link
-            name_tag = product.find('h4', class_='product-product')
-            if not name_tag:
-                 print("Skipping card, cannot find product name tag.")
-                 continue
-                 
-            product_link_tag = name_tag.find_parent('a')
-            if not product_link_tag:
-                print("Skipping card, cannot find parent link tag for name.")
-                continue
-                
-            product_link_href = product_link_tag.get('href')
-            if not product_link_href:
-                print("Skipping card, link tag has no href.")
-                continue
-            # --- END NEW LINK FINDING ---
-
-            brand = product.find('h3', class_='product-brand')
-            price_element = product.find('span', class_='product-discountedPrice')
-            if not price_element:
-                price_element = product.find('div', class_='product-price')
-            
-            image = product.find('img')
-            image_url = None
-            if image:
-                image_url = image.get('data-src')
-                if not image_url:
-                    image_url = image.get('src')
-            
-            if not all([brand, price_element, image_url]):
-                print("Skipping a card, missing brand, price, or image.")
-                continue
-
-            brand_text = brand.get_text().strip()
-            name_text = name_tag.get_text().strip()
-            price_text = price_element.get_text().strip().replace('Rs. ', '₹')
-            
-            # Use the new href variable
-            product_url = "https://www.myntra.com" + product_link_href
-            product_id_slug = product_link_href.split('/')[-1]
-            product_id = f"myntra_{product_id_slug}"
-            
-            scraped_products.append({
-                "_id": product_id,
-                "productName": f"{brand_text} - {name_text}",
-                "price": price_text,
-                "imageUrl": image_url,
-                "productUrl": product_url,
-                "source": "Myntra",
-                "brand": brand_text,
-                "category": category
-            })
-            
-        return scraped_products
-
-    except Exception as e:
-        print(f"✗ An unexpected error occurred during scraping: {e}")
-        return []
-    finally:
-        driver.quit()
-
-def main():
-    if len(sys.argv) != 3:
-        print("Error: You must provide a URL slug and a category name.")
-        print("Example: py scraper.py nike-sneakers shoes")
-        print("Example: py scraper.py nike-tshirts tshirts")
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching URL {url}: {e}")
         return
 
-    url_slug = sys.argv[1]
-    category = sys.argv[2]
-    scrape_url = f"https://www.myntra.com/{url_slug}"
+    soup = BeautifulSoup(response.content, "html.parser")
+    products = soup.find_all("li", class_="product-base")
 
-    print(f"--- Starting Selenium Scraper for category: {category} ---")
-    
-    products = scrape_myntra_selenium(scrape_url, category)
-    
     if not products:
-        print("Scraping failed or found no products. Exiting.")
+        print(f"No products found on {url}. Check selector or page structure.")
         return
 
-    for product in products:
-        product['scrapedAt'] = datetime.now(timezone.utc)
-        
-        result = products_collection.update_one(
-            {'_id': product['_id']},
-            {
-                '$set': product,
-                '$unset': {'styleEmbedding': ''}
-            },
-            upsert=True
+    print(f"Found {len(products)} products. Processing first {PRODUCT_LIMIT}...")
+
+    for product in products[:PRODUCT_LIMIT]:
+        product_link_tag = product.find("a")
+        product_link = (
+            product_link_tag["href"] if product_link_tag else None
         )
-    
-    print(f"\n--- Scraping complete! Processed {len(products)} {category}. ---")
+
+        product_brand_tag = product.find("h3", class_="product-brand")
+        product_brand = (
+            product_brand_tag.get_text(strip=True) if product_brand_tag else "N/A"
+        )
+
+        product_name_tag = product.find("h4", class_="product-product")
+        product_name = (
+            product_name_tag.get_text(strip=True) if product_name_tag else "N/A"
+        )
+
+        product_price_tag = product.find("span", class_="product-discountedPrice")
+        if not product_price_tag:
+            product_price_tag = product.find(
+                "div", class_="product-price"
+            )  # Fallback
+        
+        product_price = "N/A"
+        if product_price_tag:
+            price_text = product_price_tag.get_text(strip=True)
+            # Clean price text (e.g., "Rs. 1234")
+            product_price = price_text.replace("Rs.", "").strip()
+
+
+        image_tag = product.find("img", class_="img-responsive")
+        image_url = image_tag["src"] if image_tag and "src" in image_tag.attrs else None
+        
+        # --- FIX IS HERE ---
+        product_id = None  # Start with None instead of "buy"
+        if product_link:
+            try:
+                # Extract the last part of the URL path
+                product_id = product_link.split("/")[-1]
+                
+                # Ensure product_id is not empty or a default value
+                if not product_id or product_id == "buy":
+                    print(f"Parsed invalid product_id '{product_id}' from link: {product_link}")
+                    product_id = None
+            except Exception as e:
+                print(f"Error parsing product link {product_link}: {e}")
+                product_id = None
+        
+        # If we couldn't get a unique ID, skip this product
+        if not product_id:
+            print(f"Could not find a unique product ID. Skipping product: {product_name} ({product_brand})")
+            continue  # Skip to the next product
+        
+        # --- END OF FIX ---
+
+        product_data = {
+            "name": product_name,
+            "brand": product_brand,
+            "price": product_price,
+            "product_link": product_link,
+            "image_url": image_url,
+            "category": category_name,  # Add category
+            "site": SITE_NAME,
+            "scraped_at": datetime.utcnow(),
+        }
+
+        try:
+            # Use update_one with upsert=True to insert or update the product
+            # The _id will now be unique (e.g., "myntra_12345")
+            collection.update_one(
+                {"_id": f"{SITE_NAME}_{product_id}"},
+                {"$set": product_data},
+                upsert=True,
+            )
+            print(f"Upserted product: {SITE_NAME}_{product_id}")
+        except Exception as e:
+            print(f"Error upserting product {SITE_NAME}_{product_id} to MongoDB: {e}")
+
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) < 3:
+        print("Usage: python scraper.py <url_slug> <category_name>")
+        print("Example: python scraper.py nike-tshirts tshirts")
+        sys.exit(1)
+
+    url_slug_to_scrape = sys.argv[1]
+    category_name_to_assign = sys.argv[2]
+    scrape_myntra(url_slug_to_scrape, category_name_to_assign)
+
+    print("Scraping complete.")

@@ -53,10 +53,10 @@ const Home = () => {
         <section className="mb-16">
           <h2 className="text-2xl font-bold mb-6">Top Trending Deals</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <ProductCard name="Premium Wireless Headphones" price="$299" productId="myntra_123456" />
-            <ProductCard name="Smart Watch Pro" price="$399" productId="myntra_789012" />
-            <ProductCard name="Designer Sunglasses" price="$159" productId="myntra_345678" />
-            <ProductCard name="Leather Backpack" price="$129" productId="myntra_456789" />
+            <ProductCard name="Premium Wireless Headphones" price="$299" productId="myntra_123456" source="Myntra" />
+            <ProductCard name="Smart Watch Pro" price="$399" productId="myntra_789012" source="Superkicks" />
+            <ProductCard name="Designer Sunglasses" price="$159" productId="myntra_345678" source="VegNonVeg" />
+            <ProductCard name="Leather Backpack" price="$129" productId="myntra_456789" source="Myntra" />
           </div>
         </section>
 

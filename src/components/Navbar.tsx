@@ -13,7 +13,7 @@ const Navbar = () => {
 
   const navLinks = [
     { label: "COMPARE DEALS", href: "/compare" },
-    { label: "AI STYLE BUILDER", href: "#style" },
+    { label: "AI STYLE BUILDER", href: "/style-builder" },
     { label: "SEARCH BY CATEGORY", href: "#category" },
   ];
 

@@ -47,6 +47,8 @@ app.get('/api/products-by-ids', async (req, res) => {
 });
 
 // Search products
+// NOTE: For better performance, create a text index in MongoDB:
+// db.products.createIndex({ productName: "text", brand: "text", category: "text" })
 app.get('/api/search', async (req, res) => {
   try {
     const { q } = req.query;
@@ -55,9 +57,28 @@ app.get('/api/search', async (req, res) => {
       return res.status(400).json({ error: 'q parameter required' });
     }
     
+    // Try text search first (requires text index)
+    try {
+      const products = await Product.find(
+        { $text: { $search: q } },
+        { score: { $meta: "textScore" } }
+      )
+      .sort({ score: { $meta: "textScore" } })
+      .limit(20);
+      
+      if (products.length > 0) {
+        return res.json(products);
+      }
+    } catch (textSearchError) {
+      // Fallback to regex if text index doesn't exist
+      console.log('Text index not available, using regex search');
+    }
+    
+    // Fallback: regex search
     const products = await Product.find({
       $or: [
         { productName: { $regex: q, $options: 'i' } },
+        { brand: { $regex: q, $options: 'i' } },
         { category: { $regex: q, $options: 'i' } }
       ]
     }).limit(20);

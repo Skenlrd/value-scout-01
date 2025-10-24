@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Menu, Star, User, ShoppingBag } from "lucide-react";
+// Import the 'Sparkles' icon
+import { Menu, Star, User, ShoppingBag, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -17,55 +18,62 @@ const Navbar = () => {
   ];
 
   return (
-    <nav className="bg-background/95 backdrop-blur-sm border-b border-border">
+    <nav className="border-b border-border">
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          {/* Hamburger Menu */}
-          <Sheet open={isOpen} onOpenChange={setIsOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-foreground">
-                <Menu className="h-6 w-6" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-64">
-              <nav className="flex flex-col gap-4 mt-8">
-                {navLinks.map((link) => (
-                  <a
-                    key={link.label}
-                    href={link.href}
-                    className="text-sm font-medium hover:text-brand-scout transition-colors"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    {link.label}
-                  </a>
-                ))}
-              </nav>
-            </SheetContent>
-          </Sheet>
+        {/* Using grid for perfect centering of text */}
+        <div className="grid grid-cols-3 items-center h-16">
+          
+          {/* Hamburger Menu (Left Aligned) */}
+          <div className="justify-self-start">
+            <Sheet open={isOpen} onOpenChange={setIsOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="text-foreground">
+                  <Menu className="h-6 w-6" /> {/* Kept at h-6 w-6 */}
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-64">
+                <nav className="flex flex-col gap-4 mt-8">
+                  {navLinks.map((link) => (
+                    <a
+                      key={link.label}
+                      href={link.href}
+                      className="text-sm font-medium hover:text-brand-scout transition-colors flex items-center gap-2"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      {link.label === "AI STYLE BUILDER" && <Sparkles className="h-5 w-5" />}
+                      {link.label}
+                    </a>
+                  ))}
+                </nav>
+              </SheetContent>
+            </Sheet>
+          </div>
 
-          {/* Center Navigation (Desktop) */}
-          <div className="hidden lg:flex items-center justify-center flex-1 gap-8">
+          {/* Center Navigation (Center Aligned) */}
+          <div className="hidden lg:flex items-center justify-self-center gap-8">
             {navLinks.map((link) => (
               <a
                 key={link.label}
                 href={link.href}
-                className="text-sm font-medium hover:text-brand-scout transition-colors"
+                className="text-sm font-medium hover:text-brand-scout transition-colors whitespace-nowrap flex items-center gap-2"
               >
+                {/* AI icon size */}
+                {link.label === "AI STYLE BUILDER" && <Sparkles className="h-5 w-5" />}
                 {link.label}
               </a>
             ))}
           </div>
 
-          {/* Right Icons */}
-          <div className="flex items-center gap-4">
+          {/* Right Icons (Right Aligned) - Increased size to h-6 w-6 */}
+          <div className="flex items-center gap-4 justify-self-end">
             <Button variant="ghost" size="icon" className="text-foreground hover:text-brand-scout">
-              <Star className="h-5 w-5" />
+              <Star className="h-6 w-6" /> {/* Changed from h-5 w-5 */}
             </Button>
             <Button variant="ghost" size="icon" className="text-foreground hover:text-brand-scout">
-              <User className="h-5 w-5" />
+              <User className="h-6 w-6" /> {/* Changed from h-5 w-5 */}
             </Button>
             <Button variant="ghost" size="icon" className="text-foreground hover:text-brand-scout">
-              <ShoppingBag className="h-5 w-5" />
+              <ShoppingBag className="h-6 w-6" /> {/* Changed from h-5 w-5 */}
             </Button>
           </div>
         </div>

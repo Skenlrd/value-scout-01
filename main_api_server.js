@@ -1,17 +1,28 @@
 // main_api_server.js
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
+// ADD THESE LINES
+import express from 'express';
+import mongoose from 'mongoose';
+import cors from 'cors';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Connect to MongoDB
+// --- MODIFIED CODE ----
+// Added .then() and .catch() to see the connection status
 mongoose.connect('mongodb://localhost:27017/value_scout', {
   useNewUrlParser: true,
   useUnifiedTopology: true
+})
+.then(() => {
+  console.log("✓ Successfully connected to MongoDB");
+})
+.catch((err) => {
+  console.error("✗ FAILED TO CONNECT TO MONGODB");
+  console.error(err);
+  process.exit(1); // Exit the app if we can't connect
 });
+// --- END OF MODIFIED CODE ---
 
 // Define Product Schema
 const productSchema = new mongoose.Schema({
@@ -91,5 +102,5 @@ app.get('/api/search', async (req, res) => {
 
 const PORT = 8080;
 app.listen(PORT, () => {
-  console.log(`Main API running on http://localhost:${PORT}`);
+  console.log(`Main API running on http://localhost:${8080}`);
 });

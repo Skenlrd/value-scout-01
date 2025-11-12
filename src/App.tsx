@@ -8,22 +8,14 @@ import Navbar from "./components/Navbar"; // Assuming you need Navbar
 function App() {
   // NOTE: In a real app, this should come from a global Auth Context or state management.
   // We hardcode it to false for now so you can test the Auth page immediately.
-<<<<<<< HEAD
-  const [isLoggedIn, setIsLoggedIn] = useState(true); 
-=======
   const [isLoggedIn, setIsLoggedIn] = useState(false); 
->>>>>>> 4822f5296d2bebfa0b49a2b06f37aefeeab4883c
   
   // Placeholder for user state, if needed later (e.g., to pass to Navbar)
   // const [user, setUser] = useState(null); 
 
   // Simple placeholder logic for toggling login state (to test routing)
   const handleLogin = () => setIsLoggedIn(true);
-<<<<<<< HEAD
-  const handleLogout = () => setIsLoggedIn(true);
-=======
   const handleLogout = () => setIsLoggedIn(false);
->>>>>>> 4822f5296d2bebfa0b49a2b06f37aefeeab4883c
 
   // If the user is not logged in, they can only access the Auth page.
   if (!isLoggedIn) {

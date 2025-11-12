@@ -27,6 +27,16 @@ const ProductCard: React.FC<ProductCardProps> = ({ productId, productName, name,
   const displayName = productName ?? name ?? "";
   const [open, setOpen] = useState(false);
 
+  const formatPrice = (val?: number | string) => {
+    if (val === undefined || val === null) return "";
+    if (typeof val === "number") return `₹${val}`;
+    const s = String(val).trim();
+    // If string already contains a currency symbol (non-digit at start), return as-is
+    if (/^[^0-9]+/.test(s)) return s;
+    // Otherwise assume numeric string and prefix with ₹
+    return `₹${s}`;
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <div>
@@ -41,9 +51,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ productId, productName, name,
             </div>
             <div style={{ padding: 12 }}>
               <div style={{ fontWeight: 600 }}>{displayName}</div>
-              <div style={{ color: "#666", marginTop: 6 }}>
-                {price !== undefined && price !== null ? (typeof price === "number" ? `₹${price}` : price) : ""}
-              </div>
+              <div style={{ color: "#666", marginTop: 6 }}>{formatPrice(price)}</div>
             </div>
           </a>
 
@@ -89,8 +97,8 @@ const AIStyleBuilderModalContent: React.FC<AIStyleBuilderModalContentProps> = ({
       setIsLoading(true);
       setError(null);
       try {
-        // Call 1: Python AI API
-        const resp1 = await fetch(`http://localhost:5000/api/style-builder/${encodeURIComponent(baseProductId)}`);
+        // Call 1: Python AI API (proxied through Node backend at /api/style-builder/:id)
+        const resp1 = await fetch(`/api/style-builder/${encodeURIComponent(baseProductId)}`);
         if (!resp1.ok) {
           throw new Error(`AI API returned ${resp1.status}`);
         }
@@ -104,9 +112,9 @@ const AIStyleBuilderModalContent: React.FC<AIStyleBuilderModalContentProps> = ({
           return;
         }
 
-        // Call 2: Node Main API to fetch product details
+        // Call 2: Node Main API to fetch product details (proxied via Vite /api)
         const idsParam = ids.map(encodeURIComponent).join(",");
-        const resp2 = await fetch(`http://localhost:8080/api/products-by-ids?ids=${idsParam}`);
+        const resp2 = await fetch(`/api/products-by-ids?ids=${idsParam}`);
         if (!resp2.ok) {
           throw new Error(`Main API returned ${resp2.status}`);
         }
@@ -156,7 +164,7 @@ const AIStyleBuilderModalContent: React.FC<AIStyleBuilderModalContentProps> = ({
                   {p.imageUrl ? <img src={p.imageUrl} alt={p.productName || p.name} style={{ maxWidth: "100%", maxHeight: "100%" }} /> : <Skeleton style={{ height: 140 }} />}
                 </div>
                 <div style={{ marginTop: 8, fontWeight: 600 }}>{p.productName}</div>
-                <div style={{ marginTop: 4, color: "#666" }}>{p.price ? `₹${p.price}` : ""}</div>
+                <div style={{ marginTop: 4, color: "#666" }}>{formatPrice(p.price)}</div>
               </a>
             </div>
           ))}

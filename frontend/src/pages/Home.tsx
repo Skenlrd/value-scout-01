@@ -1,5 +1,3 @@
-import BrandLogo from "../components/BrandLogo";
-import Navbar from "../components/Navbar";
 import SearchBar from "../components/SearchBar";
 import ProductCard from "../components/ProductCard";
 import DealCard from "../components/DealCard";
@@ -10,13 +8,6 @@ import heroVideo from "../assets/video1.mp4";
 const Home = () => {
   return (
     <div className="min-h-screen">
-      {/* Brand Header */}
-      <header className="text-center py-6">
-        <BrandLogo size="md" />
-      </header>
-
-      {/* Navigation */}
-      <Navbar />
 
       {/* Hero Section with Search */}
       <section className="relative h-[60vh] max-h-[500px] overflow-hidden">

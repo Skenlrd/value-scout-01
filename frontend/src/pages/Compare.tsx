@@ -1,5 +1,4 @@
 import { useState } from "react";
-import BrandLogo from "@/components/BrandLogo";
 import SearchBar from "@/components/SearchBar";
 import ComparisonProductCard from "@/components/ComparisonProductCard";
 import { Button } from "@/components/ui/button";

@@ -1,0 +1,25 @@
+{
+  "name": "value-scout-backend",
+  "version": "1.0.0",
+  "main": "main_api_server.js",
+  "scripts": {
+    "start": "node main_api_server.js",
+    "dev": "nodemon main_api_server.js",
+    "start:ai": "cd ../ai && python ai_api.py",
+    "start:backend": "node main_api_server.js",
+    "start:frontend": "cd ../frontend && npm run dev",
+    "start:all": "concurrently --names \"[AI]\" --prefix \"[{name}]\" --kill-others \"npm run start:ai\" \"npm run start:backend\" \"npm run start:frontend\""
+  },
+  "dependencies": {
+    "axios": "^1.6.7",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "mongoose": "^8.19.3"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "nodemon": "^3.1.11"
+  }
+}

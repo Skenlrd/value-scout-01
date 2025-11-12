@@ -1,6 +1,5 @@
 import { useState } from "react";
 import BrandLogo from "@/components/BrandLogo";
-import Navbar from "@/components/Navbar";
 import SearchBar from "@/components/SearchBar";
 import ComparisonProductCard from "@/components/ComparisonProductCard";
 import { Button } from "@/components/ui/button";
@@ -40,13 +39,6 @@ const Compare = () => {
   return (
     // Updated this div to use the gradient background from index.css
     <div className="min-h-screen bg-background" style={{ backgroundImage: 'var(--gradient-bg)' }}> {/* Changed background */}
-      {/* Brand Header */}
-      <header className="text-center py-6">
-        <BrandLogo size="md" />
-      </header>
-
-      {/* Navigation */}
-      <Navbar />
 
       {/* Hero Section with Search - Removed the gradient classes */}
       <section className="relative py-20">

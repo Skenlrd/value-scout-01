@@ -1,4 +1,5 @@
-import { useState } from "react";
+import React, { useState } from "react";
+import { Link } from "react-router-dom";
 // Import the 'Sparkles' icon
 import { Menu, Star, User, ShoppingBag, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,12 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
-const Navbar = () => {
+type NavbarProps = {
+  onLogout?: () => void;
+  isLoggedIn?: boolean;
+};
+
+const Navbar = ({ onLogout }: NavbarProps) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const navLinks = [
@@ -34,15 +40,27 @@ const Navbar = () => {
               <SheetContent side="left" className="w-64">
                 <nav className="flex flex-col gap-4 mt-8">
                   {navLinks.map((link) => (
-                    <a
-                      key={link.label}
-                      href={link.href}
-                      className="text-sm font-medium hover:text-brand-scout transition-colors flex items-center gap-2"
-                      onClick={() => setIsOpen(false)}
-                    >
-                      {link.label === "AI STYLE BUILDER" && <Sparkles className="h-5 w-5" />}
-                      {link.label}
-                    </a>
+                    link.href.startsWith("/") ? (
+                      <Link
+                        key={link.label}
+                        to={link.href}
+                        className="text-sm font-medium hover:text-brand-scout transition-colors flex items-center gap-2"
+                        onClick={() => setIsOpen(false)}
+                      >
+                        {link.label === "AI STYLE BUILDER" && <Sparkles className="h-5 w-5" />}
+                        {link.label}
+                      </Link>
+                    ) : (
+                      <a
+                        key={link.label}
+                        href={link.href}
+                        className="text-sm font-medium hover:text-brand-scout transition-colors flex items-center gap-2"
+                        onClick={() => setIsOpen(false)}
+                      >
+                        {link.label === "AI STYLE BUILDER" && <Sparkles className="h-5 w-5" />}
+                        {link.label}
+                      </a>
+                    )
                   ))}
                 </nav>
               </SheetContent>
@@ -52,15 +70,26 @@ const Navbar = () => {
           {/* Center Navigation (Center Aligned) */}
           <div className="hidden lg:flex items-center justify-self-center gap-8">
             {navLinks.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                className="text-sm font-medium hover:text-brand-scout transition-colors whitespace-nowrap flex items-center gap-2"
-              >
-                {/* AI icon size */}
-                {link.label === "AI STYLE BUILDER" && <Sparkles className="h-5 w-5" />}
-                {link.label}
-              </a>
+              link.href.startsWith("/") ? (
+                <Link
+                  key={link.label}
+                  to={link.href}
+                  className="text-sm font-medium hover:text-brand-scout transition-colors whitespace-nowrap flex items-center gap-2"
+                >
+                  {/* AI icon size */}
+                  {link.label === "AI STYLE BUILDER" && <Sparkles className="h-5 w-5" />}
+                  {link.label}
+                </Link>
+              ) : (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  className="text-sm font-medium hover:text-brand-scout transition-colors whitespace-nowrap flex items-center gap-2"
+                >
+                  {link.label === "AI STYLE BUILDER" && <Sparkles className="h-5 w-5" />}
+                  {link.label}
+                </a>
+              )
             ))}
           </div>
 

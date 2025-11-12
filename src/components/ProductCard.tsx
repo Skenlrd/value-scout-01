@@ -6,6 +6,8 @@ import { Dialog, DialogTrigger, DialogContent } from "./ui/dialog";
 import { Badge } from "./ui/badge"; 
 // Change: from "../ui/Button" to "./ui/button"
 import { Button } from "./ui/button"; 
+// FIX: Add the missing Card import
+import { Card, CardFooter } from "./ui/card";
 // ... rest of the fileadjust import path
 import { Skeleton } from "./ui/skeleton";// adjust import path for Skeleton if needed
 

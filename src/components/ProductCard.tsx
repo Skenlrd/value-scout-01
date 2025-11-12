@@ -13,14 +13,18 @@ import { Skeleton } from "./ui/skeleton";// adjust import path for Skeleton if n
 
 interface ProductCardProps {
   productId: string;
-  productName: string;
-  price?: number;
+  // Accept either 'productName' or legacy 'name' prop
+  productName?: string;
+  name?: string;
+  // Accept price as number or string (many data sources use strings like "$299")
+  price?: number | string;
   imageUrl?: string;
   productUrl?: string;
   source?: string;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ productId, productName, price, imageUrl, productUrl, source }) => {
+const ProductCard: React.FC<ProductCardProps> = ({ productId, productName, name, price, imageUrl, productUrl, source }) => {
+  const displayName = productName ?? name ?? "";
   const [open, setOpen] = useState(false);
 
   return (
@@ -30,14 +34,16 @@ const ProductCard: React.FC<ProductCardProps> = ({ productId, productName, price
           <a href={productUrl} target="_blank" rel="noreferrer" style={{ textDecoration: "none", color: "inherit" }}>
             <div style={{ width: "100%", height: 220, backgroundColor: "#f3f3f3", display: "flex", alignItems: "center", justifyContent: "center" }}>
               {imageUrl ? (
-                <img src={imageUrl} alt={productName} style={{ maxWidth: "100%", maxHeight: "100%" }} />
+                <img src={imageUrl} alt={displayName} style={{ maxWidth: "100%", maxHeight: "100%" }} />
               ) : (
-                <Skeleton height={220} />
+                <Skeleton style={{ height: 220 }} />
               )}
             </div>
             <div style={{ padding: 12 }}>
-              <div style={{ fontWeight: 600 }}>{productName}</div>
-              <div style={{ color: "#666", marginTop: 6 }}>{price ? `₹${price}` : ""}</div>
+              <div style={{ fontWeight: 600 }}>{displayName}</div>
+              <div style={{ color: "#666", marginTop: 6 }}>
+                {price !== undefined && price !== null ? (typeof price === "number" ? `₹${price}` : price) : ""}
+              </div>
             </div>
           </a>
 
@@ -132,8 +138,8 @@ const AIStyleBuilderModalContent: React.FC<AIStyleBuilderModalContentProps> = ({
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i}>
-              <Skeleton height={140} />
-              <Skeleton height={16} style={{ marginTop: 8 }} />
+              <Skeleton style={{ height: 140 }} />
+              <Skeleton style={{ height: 16, marginTop: 8 }} />
             </div>
           ))}
         </div>
@@ -147,7 +153,7 @@ const AIStyleBuilderModalContent: React.FC<AIStyleBuilderModalContentProps> = ({
             <div key={p._id} style={{ border: "1px solid #eee", padding: 8, borderRadius: 6 }}>
               <a href={p.productUrl} target="_blank" rel="noreferrer" style={{ textDecoration: "none", color: "inherit" }}>
                 <div style={{ width: "100%", height: 140, display: "flex", alignItems: "center", justifyContent: "center", background: "#fafafa" }}>
-                  {p.imageUrl ? <img src={p.imageUrl} alt={p.productName} style={{ maxWidth: "100%", maxHeight: "100%" }} /> : <Skeleton height={140} />}
+                  {p.imageUrl ? <img src={p.imageUrl} alt={p.productName || p.name} style={{ maxWidth: "100%", maxHeight: "100%" }} /> : <Skeleton style={{ height: 140 }} />}
                 </div>
                 <div style={{ marginTop: 8, fontWeight: 600 }}>{p.productName}</div>
                 <div style={{ marginTop: 4, color: "#666" }}>{p.price ? `₹${p.price}` : ""}</div>

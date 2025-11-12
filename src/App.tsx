@@ -9,14 +9,11 @@ import Navbar from "./components/Navbar";
 import BrandLogo from "./components/BrandLogo";
 
 function App() {
-  // NOTE: In a real app, this should come from a global Auth Context or state management.
-  // We keep a simple boolean here for demonstration and to show protected-route usage.
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const handleLogin = () => setIsLoggedIn(true);
   const handleLogout = () => setIsLoggedIn(false);
 
-  // Reusable protected route wrapper
   const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
     return isLoggedIn ? children : <Navigate to="/login" replace />;
   };
@@ -30,21 +27,25 @@ function App() {
 
       <Navbar onLogout={handleLogout} isLoggedIn={isLoggedIn} />
 
-      <main className="pt-[20px]">
+      {/* Unified gradient background for all pages */}
+      <main className="min-h-screen bg-gradient-to-br from-[#eaf6f2] to-[#b6c9c3] pt-[20px]">
         <Routes>
-          {/* Public routes: accessible without login */}
+          {/* Public routes */}
           <Route path="/" element={<Home />} />
           <Route path="/compare" element={<Compare />} />
           <Route path="/style-builder" element={<StyleBuilderSearchPage />} />
 
-          {/* Auth pages */}
+          {/* Auth routes */}
           <Route path="/login" element={<Auth onLogin={handleLogin} />} />
-          <Route path="/signup" element={<Auth onLogin={handleLogin} initialMode="signup" />} />
+          <Route
+            path="/signup"
+            element={<Auth onLogin={handleLogin} initialMode="signup" />}
+          />
 
-          {/* Example protected route usage (uncomment/add real protected pages) */}
+          {/* Example protected route */}
           {/* <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} /> */}
 
-          {/* Fallback / Not Found */}
+          {/* 404 fallback */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>

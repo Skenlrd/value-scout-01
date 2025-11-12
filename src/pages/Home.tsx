@@ -1,26 +1,22 @@
 import BrandLogo from "../components/BrandLogo";
+import Navbar from "../components/Navbar";
 import SearchBar from "../components/SearchBar";
 import ProductCard from "../components/ProductCard";
 import DealCard from "../components/DealCard";
 import WishlistCard from "../components/WishlistCard";
 // Import the video file
 import heroVideo from "../assets/video1.mp4";
-// FIX: Import the simulated Auth hook to ensure user data is always available
-import useAuth from "../hooks/useAuth"; 
 
 const Home = () => {
-  // FIX: Access the user data. This ensures 'user' is not null, 
-  // preventing the "Cannot read properties of null (reading 'user_id')" error 
-  // that was happening around line 42.
-  const { user, isLoading } = useAuth();
-  
-  // NOTE: If there was a loading check, you could use 'isLoading' here.
-  
-  // To verify the fix, you can temporarily log the ID:
-  console.log("Authenticated User ID:", user.user_id);
-  
   return (
     <div className="min-h-screen">
+      {/* Brand Header */}
+      <header className="text-center py-6">
+        <BrandLogo size="md" />
+      </header>
+
+      {/* Navigation */}
+      <Navbar />
 
       {/* Hero Section with Search */}
       <section className="relative h-[60vh] max-h-[500px] overflow-hidden">
@@ -132,3 +128,4 @@ const Home = () => {
 };
 
 export default Home;
+

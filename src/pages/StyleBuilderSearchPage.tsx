@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import SearchBar from "../components/SearchBar";
 import ProductCard from "../components/ProductCard";
-import { Skeleton } from "../components/ui/skeleton"; // adjust path if your project uses a different Skeleton component
+import { Skeleton } from "../components/ui/skeleton";
 
 interface Product {
   _id: string;
@@ -21,18 +21,18 @@ const StyleBuilderSearchPage: React.FC = () => {
 
   const handleSearch = async (q: string) => {
     setQuery(q);
-    if (!q || q.trim().length === 0) {
+    if (!q.trim()) {
       setResults([]);
       return;
     }
+
     setIsLoading(true);
     try {
-      const encoded = encodeURIComponent(q);
-      const resp = await fetch(`http://localhost:8080/api/search?q=${encoded}`);
+      const resp = await fetch(`http://localhost:8080/api/search?q=${encodeURIComponent(q)}`);
       const json = await resp.json();
       setResults(json || []);
     } catch (err) {
-      console.error("Search failed", err);
+      console.error("Search failed:", err);
       setResults([]);
     } finally {
       setIsLoading(false);
@@ -40,37 +40,51 @@ const StyleBuilderSearchPage: React.FC = () => {
   };
 
   return (
-    <div style={{ padding: 24 }}>
-      <h1>AI Style Builder</h1>
-      <p>Search our catalog for clothing and sneakers, then use the AI icon on any product to build outfits.</p>
+    <div className="px-6 sm:px-10 md:px-16 lg:px-24 py-10">
+      <div className="max-w-7xl mx-auto text-center">
+        <h1 className="text-3xl md:text-4xl font-semibold text-gray-800 mb-3">
+          AI Style Builder
+        </h1>
+        <p className="text-gray-700 mb-8 text-sm md:text-base">
+          Search clothing and footwear, then tap the AI icon on any product to generate matching outfit ideas instantly.
+        </p>
 
-      <SearchBar onSearch={handleSearch} />
+        <div className="max-w-2xl mx-auto mb-10">
+          <SearchBar onSearch={handleSearch} />
+        </div>
 
-      {isLoading ? (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16, marginTop: 16 }}>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i}>
-              <Skeleton height={220} />
-              <Skeleton height={20} style={{ marginTop: 8 }} />
-              <Skeleton height={16} style={{ marginTop: 6 }} />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16, marginTop: 16 }}>
-          {results.map((product) => (
-            <ProductCard
-              key={product._id}
-              productId={product._id}
-              productName={product.productName}
-              price={product.price}
-              imageUrl={product.imageUrl}
-              productUrl={product.productUrl}
-              source={product.source}
-            />
-          ))}
-        </div>
-      )}
+        {isLoading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 mt-8">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="h-64 w-full rounded-xl" />
+                <Skeleton className="h-5 w-3/4 mx-auto" />
+                <Skeleton className="h-4 w-1/2 mx-auto" />
+              </div>
+            ))}
+          </div>
+        ) : results.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 mt-8">
+            {results.map((product) => (
+              <ProductCard
+                key={product._id}
+                productId={product._id}
+                productName={product.productName}
+                price={product.price}
+                imageUrl={product.imageUrl}
+                productUrl={product.productUrl}
+                source={product.source}
+              />
+            ))}
+          </div>
+        ) : (
+          query && (
+            <p className="text-gray-600 mt-10 text-sm md:text-base">
+              No results found. Try refining your search.
+            </p>
+          )
+        )}
+      </div>
     </div>
   );
 };

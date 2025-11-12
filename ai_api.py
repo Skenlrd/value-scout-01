@@ -22,6 +22,24 @@ COLLECTION_NAME = "products"
 app = Flask(__name__)
 CORS(app)
 
+# Diagnostic Plan
+# 1. What to check in the Browser's NETWORK Tab (the first and most important check)
+#    - Check if the requests to the API are successful (status 200)
+#    - Check if the requests are being made and if the responses match the expected format
+#    - Check if there are any errors or warnings in the console
+# 2. What to check in main_api_server.js if the Network check fails
+#    - Check if the server logs indicate any errors or issues
+#    - Check if the server is running and listening on the correct port
+#    - Check if the API routes are defined correctly and if they are being hit
+# 3. What to check in src/pages/Home.tsx if the Network check succeeds but products still don't show
+#    - Check if the data returned from the API is in the expected format
+#    - Check if the data is being properly stored in the component's state
+#    - Check if the component is rendering correctly and if the correct data is being passed as props
+# 4. What backend Python files (scraper.py, process_embeddings.py) to examine if the server logs indicate a data retrieval or processing error
+#    - Check if there are any warnings or errors in the logs
+#    - Check if the relevant Python files are being executed and if the data is being retrieved correctly
+#    - Check if the data is being processed correctly and if the embeddings are being computed correctly
+
 client = pymongo.MongoClient(MONGO_URI)
 db = client[DB_NAME]
 products_collection = db[COLLECTION_NAME]

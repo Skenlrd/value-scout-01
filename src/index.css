@@ -115,7 +115,8 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
-  body {
+  body 
+  {
     @apply text-foreground;
     background: hsl(var(--background));
     background-image: var(--gradient-bg);
@@ -124,7 +125,9 @@ All colors MUST be HSL.
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  
+  .bg-app-gradient {
+  background: linear-gradient(to bottom right, #eaf6f2, #b6c9c3);
+}
   .font-pixel {
     font-family: 'Press Start 2P', cursive;
   }

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import SearchBar from "../components/SearchBar";
 import ProductCard from "../components/ProductCard";
-import { Skeleton } from "../components/Skeleton"; // adjust path if your project uses a different Skeleton component
+import { Skeleton } from "../components/ui/skeleton"; // adjust path if your project uses a different Skeleton component
 
 interface Product {
   _id: string;

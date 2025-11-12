@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { Wand2 } from "lucide-react";
-import { Dialog, DialogTrigger, DialogContent } from "../ui/Dialog"; // adjust import path if your Dialog is elsewhere
-import { Badge } from "../ui/Badge"; // adjust import path
-import { Button } from "../ui/Button"; // adjust import path
-import { Card, CardFooter } from "../ui/Card"; // adjust import path
-import { Skeleton } from "../components/Skeleton"; // adjust import path for Skeleton if needed
+// Change: from "../ui/Dialog" to "./ui/dialog"
+import { Dialog, DialogTrigger, DialogContent } from "./ui/dialog"; 
+// Change: from "../ui/Badge" to "./ui/badge"
+import { Badge } from "./ui/badge"; 
+// Change: from "../ui/Button" to "./ui/button"
+import { Button } from "./ui/button"; 
+// ... rest of the fileadjust import path
+import { Skeleton } from "./ui/skeleton";// adjust import path for Skeleton if needed
 
 interface ProductCardProps {
   productId: string;

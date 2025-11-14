@@ -1,146 +1,223 @@
-#!/usr/bin/env python3
-"""
-Offline scraper placeholder.
-
-- Connects to MongoDB value_scout.products
-- Provides placeholder scrape_* functions
-- Inserts/updates a set of mock products and ensures styleEmbedding is removed ($unset)
-"""
-
+from playwright.sync_api import sync_playwright
+from pymongo import MongoClient
 import datetime
-import pymongo
-import requests
-from bs4 import BeautifulSoup  # placeholder for future scraping
+import time
+import random
 
-MONGO_URI = "mongodb://localhost:27017"
-DB_NAME = "value_scout"
-COLLECTION_NAME = "products"
+# -----------------------------
+# DB SETUP
+# -----------------------------
+client = MongoClient("mongodb://127.0.0.1:27017")
+db = client["value_scout"]
+products = db["products"]
 
-def get_db_collection():
-    client = pymongo.MongoClient(MONGO_URI)
-    db = client[DB_NAME]
-    return db[COLLECTION_NAME]
+def save(product):
+    products.update_one(
+        {"_id": product["_id"]},
+        {"$set": product, "$unset": {"styleEmbedding": ""}},
+        upsert=True
+    )
 
-def scrape_myntra():
-    # placeholder scraping logic for Myntra
-    # return list of dict product documents if implemented
-    return []
+# -----------------------------
+# COMMON BROWSER SETTINGS
+# -----------------------------
+def get_browser(p):
+    return p.chromium.launch(
+        headless=False,
+        args=[
+            "--disable-blink-features=AutomationControlled",
+            "--disable-dev-shm-usage",
+            "--disable-infobars",
+            "--no-sandbox",
+        ]
+    )
 
+def get_context(browser):
+    return browser.new_context(
+        viewport={"width": 1280, "height": 900},
+        user_agent=(
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36"
+        )
+    )
+
+# =============================================================
+# 1) SCRAPE MYNTRA (PLAYWRIGHT — FULLY UPGRADED)
+# =============================================================
+def scrape_myntra(category="shoes", pages=5):
+    print(f"\n🔵 Scraping Myntra — {category}")
+
+    with sync_playwright() as p:
+        browser = get_browser(p)
+        context = get_context(browser)
+        page = context.new_page()
+
+        for i in range(1, pages+1):
+            url = f"https://www.myntra.com/{category}?p={i}"
+            print(f"\n➡ Visiting: {url}")
+
+            try:
+                page.goto(url, timeout=90000, wait_until="domcontentloaded")
+                page.wait_for_selector("li.product-base", timeout=20000)
+            except Exception as e:
+                print(f"  ❌ Blocked: {e}")
+                continue
+
+            items = page.query_selector_all("li.product-base")
+            print(f"  ✔ Found {len(items)} items")
+
+            for item in items:
+                try:
+                    brand = item.query_selector("h3.product-brand").inner_text()
+                    name = item.query_selector("h4.product-product").inner_text()
+
+                    img = item.query_selector("img").get_attribute("src")
+                    if img.startswith("//"):
+                        img = "https:" + img
+
+                    link = item.query_selector("a").get_attribute("href")
+                    link = "https://www.myntra.com" + link
+
+                    price_el = item.query_selector(".product-discountedPrice")
+                    price = price_el.inner_text() if price_el else "N/A"
+
+                    doc = {
+                        "_id": f"myntra_{hash(link)}",
+                        "productName": f"{brand} {name}",
+                        "brand": brand,
+                        "category": category,
+                        "price": price,
+                        "imageUrl": img,
+                        "productUrl": link,
+                        "source": "Myntra",
+                        "scrapedAt": datetime.datetime.utcnow(),
+                    }
+                    save(doc)
+
+                except Exception as e:
+                    print("  ❌ Skip item:", e)
+
+            time.sleep(random.uniform(1.5, 2.2))
+
+        browser.close()
+
+# =============================================================
+# 2) SCRAPE SUPERKICKS (PLAYWRIGHT UPGRADE)
+# =============================================================
 def scrape_superkicks():
-    # placeholder scraping logic for Superkicks
-    return []
+    print("\n🟢 Scraping Superkicks…")
 
+    with sync_playwright() as p:
+        browser = get_browser(p)
+        context = get_context(browser)
+        page = context.new_page()
+
+        url = "https://superkicks.in/collections/shoes"
+        page.goto(url, timeout=90000)
+
+        try:
+            page.wait_for_selector("div.product-item", timeout=20000)
+        except:
+            print("  ❌ Blocked or no products")
+            return
+
+        items = page.query_selector_all("div.product-item")
+        print(f"  ✔ Found {len(items)} items")
+
+        for item in items:
+            try:
+                title = item.query_selector(".product-item__title").inner_text()
+                link = "https://superkicks.in" + item.query_selector("a").get_attribute("href")
+
+                price_el = item.query_selector(".price-item--regular")
+                price = price_el.inner_text() if price_el else "N/A"
+
+                img = item.query_selector("img").get_attribute("src")
+                if img.startswith("//"):
+                    img = "https:" + img
+
+                doc = {
+                    "_id": f"superkicks_{hash(link)}",
+                    "productName": title,
+                    "brand": title.split()[0],
+                    "category": "shoes",
+                    "price": price,
+                    "imageUrl": img,
+                    "productUrl": link,
+                    "source": "Superkicks",
+                    "scrapedAt": datetime.datetime.utcnow(),
+                }
+                save(doc)
+
+            except Exception:
+                continue
+
+        browser.close()
+
+# =============================================================
+# 3) SCRAPE VEGNONVEG (PLAYWRIGHT UPGRADE)
+# =============================================================
 def scrape_vegnonveg():
-    # placeholder scraping logic for VegNonVeg
-    return []
+    print("\n🟣 Scraping VegNonVeg…")
 
-def make_mock_products():
-    now = datetime.datetime.utcnow().isoformat() + "Z"
-    return [
-        {
-            "_id": "myntra_001",
-            "productName": "Nike Air Zoom Pegasus - Men's Running Shoes",
-            "brand": "Nike",
-            "category": "shoes",
-            "price": 9999,
-            "imageUrl": "https://example.com/images/nike_pegasus.jpg",
-            "productUrl": "https://www.myntra.com/nike/pegasus",
-            "source": "Myntra",
-            "scrapedAt": now,
-        },
-        {
-            "_id": "superkicks_001",
-            "productName": "Adidas UltraBoost Running Shoes",
-            "brand": "Adidas",
-            "category": "shoes",
-            "price": 11999,
-            "imageUrl": "https://example.com/images/adidas_ultraboost.jpg",
-            "productUrl": "https://www.superkicks.com/adidas/ultraboost",
-            "source": "Superkicks",
-            "scrapedAt": now,
-        },
-        {
-            "_id": "vegnonveg_001",
-            "productName": "VegNonVeg Classic Tee",
-            "brand": "VegNonVeg",
-            "category": "tshirt",
-            "price": 699,
-            "imageUrl": "https://example.com/images/vnv_tee.jpg",
-            "productUrl": "https://www.vegnonveg.com/classic-tee",
-            "source": "VegNonVeg",
-            "scrapedAt": now,
-        },
-        {
-            "_id": "myntra_002",
-            "productName": "Adidas Essentials Track Pants",
-            "brand": "Adidas",
-            "category": "pants",
-            "price": 2499,
-            "imageUrl": "https://example.com/images/adidas_pants.jpg",
-            "productUrl": "https://www.myntra.com/adidas/track-pants",
-            "source": "Myntra",
-            "scrapedAt": now,
-        },
-        {
-            "_id": "superkicks_002",
-            "productName": "Puma Casual Sneakers",
-            "brand": "Puma",
-            "category": "shoes",
-            "price": 4999,
-            "imageUrl": "https://example.com/images/puma_sneakers.jpg",
-            "productUrl": "https://www.superkicks.com/puma/casual-sneakers",
-            "source": "Superkicks",
-            "scrapedAt": now,
-        },
-        {
-            "_id": "vegnonveg_002",
-            "productName": "VegNonVeg Bomber Jacket",
-            "brand": "VegNonVeg",
-            "category": "jacket",
-            "price": 3999,
-            "imageUrl": "https://example.com/images/vnv_jacket.jpg",
-            "productUrl": "https://www.vegnonveg.com/bomber-jacket",
-            "source": "VegNonVeg",
-            "scrapedAt": now,
-        },
-    ]
+    with sync_playwright() as p:
+        browser = get_browser(p)
+        context = get_context(browser)
+        page = context.new_page()
 
-def upsert_products(products_collection, products):
-    for p in products:
-        # Remove any existing styleEmbedding so downstream processor will recompute embeddings
-        update_doc = {
-            "$set": {
-                "productName": p.get("productName"),
-                "brand": p.get("brand"),
-                "category": p.get("category"),
-                "price": p.get("price"),
-                "imageUrl": p.get("imageUrl"),
-                "productUrl": p.get("productUrl"),
-                "source": p.get("source"),
-                "scrapedAt": p.get("scrapedAt"),
-            },
-            "$unset": {"styleEmbedding": ""},  # crucial: drop existing embedding
-        }
-        result = products_collection.update_one({"_id": p["_id"]}, update_doc, upsert=True)
-        print(f"Upserted {_id_summary(p['_id'])}, matched={{result.matched_count}}, modified={{result.modified_count}}")
+        url = "https://www.vegnonveg.com/collections/shoes"
+        page.goto(url, timeout=90000)
 
-def _id_summary(_id):
-    return f"{_id}"
+        try:
+            page.wait_for_selector("div.product-card__info", timeout=20000)
+        except:
+            print("  ❌ Blocked or no products")
+            return
 
-def main():
-    products_collection = get_db_collection()
+        items = page.query_selector_all("div.product-card__info")
+        print(f"  ✔ Found {len(items)} items")
 
-    # collect mocked products
-    mock_products = make_mock_products()
+        for item in items:
+            try:
+                name = item.query_selector(".product-card__title").inner_text()
+                link = "https://www.vegnonveg.com" + item.query_selector("a").get_attribute("href")
 
-    # placeholders for actual scrape functions - left intentionally but unused for offline run
-    # myntra_products = scrape_myntra()
-    # superkicks_products = scrape_superkicks()
-    # vegnonveg_products = scrape_vegnonveg()
+                img = item.query_selector("img").get_attribute("src")
+                if img.startswith("//"):
+                    img = "https:" + img
 
-    # For offline usage, use the mock list
-    upsert_products(products_collection, mock_products)
-    print("Finished upserting mock products.")
+                price = item.query_selector(".price").inner_text()
 
+                doc = {
+                    "_id": f"vegnonveg_{hash(link)}",
+                    "productName": name,
+                    "brand": name.split()[0],
+                    "category": "shoes",
+                    "price": price,
+                    "imageUrl": img,
+                    "productUrl": link,
+                    "source": "VegNonVeg",
+                    "scrapedAt": datetime.datetime.utcnow(),
+                }
+                save(doc)
+
+            except Exception:
+                continue
+
+        browser.close()
+
+
+# =============================================================
+# MAIN
+# =============================================================
 if __name__ == "__main__":
-    main()
+    CATEGORIES = ["shoes", "tshirts", "shirts", "pants", "jeans", "shorts", "jackets"]
+
+    for cat in CATEGORIES:
+        scrape_myntra(cat, pages=5)
+
+    scrape_superkicks()
+    scrape_vegnonveg()
+
+    print("\n✅ DONE — ALL PRODUCTS SCRAPED!")

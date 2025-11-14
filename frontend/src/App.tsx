@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+
 import Home from "./pages/Home";
 import Compare from "./pages/Compare";
-import StyleBuilderSearchPage from "./pages/StyleBuilderSearchPage";
+import StyleBuilderSearchPage from "./pages/StyleBuilderSearchPage"; // ✅ Correct path
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+
 import Navbar from "./components/Navbar";
 import BrandLogo from "./components/BrandLogo";
 
@@ -20,32 +22,28 @@ function App() {
 
   return (
     <Router>
-      {/* Global header + Navbar */}
+      {/* Brand logo + Navbar */}
       <header className="text-center py-6">
         <BrandLogo size="md" />
       </header>
 
       <Navbar onLogout={handleLogout} isLoggedIn={isLoggedIn} />
 
-      {/* Unified gradient background for all pages */}
+      {/* Main layout */}
       <main className="min-h-screen bg-gradient-to-br from-[#eaf6f2] to-[#b6c9c3] pt-[20px]">
         <Routes>
           {/* Public routes */}
           <Route path="/" element={<Home />} />
           <Route path="/compare" element={<Compare />} />
+
+          {/* ✅ AI Style Builder Route */}
           <Route path="/style-builder" element={<StyleBuilderSearchPage />} />
 
-          {/* Auth routes */}
+          {/* Auth */}
           <Route path="/login" element={<Auth onLogin={handleLogin} />} />
-          <Route
-            path="/signup"
-            element={<Auth onLogin={handleLogin} initialMode="signup" />}
-          />
+          <Route path="/signup" element={<Auth onLogin={handleLogin} initialMode="signup" />} />
 
-          {/* Example protected route */}
-          {/* <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} /> */}
-
-          {/* 404 fallback */}
+          {/* 404 */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>

@@ -19,14 +19,38 @@ app.use(cors());
 
 let db = null;
 
-// Root endpoint
+// -----------------------------
+// MongoDB Connection
+// -----------------------------
+console.log("\n📡 Connecting to MongoDB...");
+mongoose
+  .connect(process.env.MONGO_URI || "mongodb://127.0.0.1:27017/value_scout")
+  .then(() => {
+    console.log("✅ MongoDB connected successfully");
+    db = mongoose.connection.db;
+    console.log("✅ Database object obtained");
+  })
+  .catch((err) => {
+    console.error("❌ MongoDB connection failed:", err.message);
+    console.log("⚠️ Continuing without database...");
+  });
+
+// Mongoose Model (flexible schema)
+const Product = mongoose.model("Product", new mongoose.Schema({}, { strict: false }));
+
+// -----------------------------
+// HEALTH CHECK
+// -----------------------------
 app.get("/", (req, res) => {
   res.json({ status: "ok", message: "ValueScout backend running" });
 });
 
-// Route that proxies to Flask AI API
+// -----------------------------
+// 1️⃣ AI STYLE BUILDER → PROXY TO PYTHON API
+// -----------------------------
 app.get("/api/style-builder/:productId", async (req, res) => {
   const aiApiUrl = `${process.env.AI_API_URL}/api/style-builder/${req.params.productId}`;
+
   try {
     const response = await axios.get(aiApiUrl);
     res.json(response.data);
@@ -36,53 +60,63 @@ app.get("/api/style-builder/:productId", async (req, res) => {
   }
 });
 
-// Simple product search endpoint
+// -----------------------------
+// 2️⃣ PRODUCT SEARCH (IMPROVED VERSION)
+// FROM YOUR NEW CODE → NOW INTEGRATED
+// -----------------------------
 app.get("/api/search", async (req, res) => {
-  const q = req.query.q;
-  if (!q || String(q).trim() === "") return res.json([]);
+  const q = req.query.q || "";
+  const trimmed = String(q).trim();
 
+  if (trimmed === "") return res.json([]);
   if (!db) return res.status(500).json({ error: "Database not initialized" });
 
   try {
     const col = db.collection(process.env.COLLECTION_NAME || "products");
-    const regex = new RegExp(String(q).trim(), "i");
+    const regex = new RegExp(trimmed, "i");
+
     const docs = await col
       .find({
         $or: [
           { productName: { $regex: regex } },
-          { name: { $regex: regex } },
           { brand: { $regex: regex } },
           { category: { $regex: regex } },
-          { source: { $regex: regex } },
+          { source: { $regex: regex } }
         ],
       })
       .limit(100)
       .toArray();
 
-    return res.json(docs);
+    res.json(docs);
   } catch (err) {
-    console.error("Error in /api/search:", err && err.message ? err.message : err);
-    return res.status(500).json({ error: err && err.message ? err.message : String(err) });
+    console.error("Error in /api/search:", err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
-// Fetch multiple products by ids
+// -----------------------------
+// 3️⃣ FETCH MULTIPLE PRODUCTS BY IDS
+// FROM YOUR NEW CODE → NOW INTEGRATED
+// -----------------------------
 app.get("/api/products-by-ids", async (req, res) => {
   const idsParam = req.query.ids;
-  if (!idsParam) {
-    return res.status(400).json({ error: "ids query parameter is required" });
-  }
+  if (!idsParam) return res.status(400).json({ error: "ids query parameter is required" });
 
   try {
-    const ids = String(idsParam).split(",").map((s) => s.trim()).filter(Boolean);
-    const converted = ids.map((id) => (mongoose.Types.ObjectId.isValid(id) ? mongoose.Types.ObjectId(id) : id));
+    const ids = String(idsParam)
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean);
 
-    if (!db) {
-      return res.status(500).json({ error: "Database not initialized yet" });
-    }
+    const converted = ids.map((id) =>
+      mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id
+    );
+
+    if (!db) return res.status(500).json({ error: "Database not initialized yet" });
 
     const collection = db.collection(process.env.COLLECTION_NAME || "products");
     const docs = await collection.find({ _id: { $in: converted } }).toArray();
+
     res.json(docs);
   } catch (err) {
     console.error("Error in /api/products-by-ids:", err.message);
@@ -90,36 +124,16 @@ app.get("/api/products-by-ids", async (req, res) => {
   }
 });
 
-// Connect to MongoDB
-console.log("\n📡 Connecting to MongoDB...");
-mongoose
-  .connect(process.env.MONGO_URI || "mongodb://127.0.0.1:27017/value_scout")
-  .then(() => {
-    console.log("✅ MongoDB connected successfully");
-    db = mongoose.connection.db;
-    console.log("✅ Database object obtained");
-    
-    // Check AI service health
-    if (process.env.AI_API_URL) {
-      console.log(`\n🤖 Checking AI service...`);
-      axios.get(`${process.env.AI_API_URL}/health`, { timeout: 2000 })
-        .then(() => console.log("✅ AI service is healthy"))
-        .catch(err => console.log("⚠️  AI service unreachable (will retry on requests)"));
-    }
-  })
-  .catch((err) => {
-    console.error("❌ MongoDB connection failed:", err.message);
-    console.log("⚠️ Continuing without database...");
-  });
-
-// Start server
+// -----------------------------
+// START SERVER
+// -----------------------------
 app.listen(PORT, () => {
   console.log(`\n🚀 Backend Server running on port ${PORT}`);
   console.log(`📍 http://localhost:${PORT}`);
   console.log(`\nReady to accept requests. Press Ctrl+C to stop.\n`);
 });
 
-// Error handlers
+// Global error handlers
 process.on("uncaughtException", (error) => {
   console.error("❌ Uncaught Exception:", error.message);
   process.exit(1);

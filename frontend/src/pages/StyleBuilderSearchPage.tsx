@@ -14,25 +14,29 @@ interface Product {
   source?: string;
 }
 
-const StyleBuilderSearchPage: React.FC = () => {
+const StyleBuilderPage: React.FC = () => {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSearch = async (q: string) => {
-    setQuery(q);
-    if (!q.trim()) {
+  const handleSearch = async (searchQuery: string) => {
+    setQuery(searchQuery);
+
+    if (!searchQuery.trim()) {
       setResults([]);
       return;
     }
 
     setIsLoading(true);
+
     try {
-      const resp = await fetch(`http://localhost:8080/api/search?q=${encodeURIComponent(q)}`);
-      const json = await resp.json();
-      setResults(json || []);
-    } catch (err) {
-      console.error("Search failed:", err);
+      const resp = await fetch(
+        `http://localhost:8080/api/search?q=${encodeURIComponent(searchQuery)}`
+      );
+      const data = await resp.json();
+      setResults(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Search failed:", error);
       setResults([]);
     } finally {
       setIsLoading(false);
@@ -45,25 +49,29 @@ const StyleBuilderSearchPage: React.FC = () => {
         <h1 className="text-3xl md:text-4xl font-semibold text-gray-800 mb-3">
           AI Style Builder
         </h1>
+
         <p className="text-gray-700 mb-8 text-sm md:text-base">
-          Search clothing and footwear, then tap the AI icon on any product to generate matching outfit ideas instantly.
+          Search clothing and footwear, then tap the AI icon on any product to
+          generate matching outfit ideas.
         </p>
 
         <div className="max-w-2xl mx-auto mb-10">
           <SearchBar onSearch={handleSearch} />
         </div>
 
+        {/* LOADING SKELETON */}
         {isLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 mt-8">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="space-y-2">
+            {Array.from({ length: 10 }).map((_, index) => (
+              <div key={index} className="space-y-2">
                 <Skeleton className="h-64 w-full rounded-xl" />
-                <Skeleton className="h-5 w-3/4 mx-auto" />
+                <Skeleton className="h-6 w-3/4 mx-auto" />
                 <Skeleton className="h-4 w-1/2 mx-auto" />
               </div>
             ))}
           </div>
         ) : results.length > 0 ? (
+          // RESULTS GRID
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 mt-8">
             {results.map((product) => (
               <ProductCard
@@ -78,10 +86,11 @@ const StyleBuilderSearchPage: React.FC = () => {
             ))}
           </div>
         ) : (
+          // NO RESULTS FOUND
           query && (
-            <p className="text-gray-600 mt-10 text-sm md:text-base">
-              No results found. Try refining your search.
-            </p>
+            <div className="mt-10 text-gray-600 text-sm md:text-base">
+              No results found. Try a different search.
+            </div>
           )
         )}
       </div>
@@ -89,4 +98,4 @@ const StyleBuilderSearchPage: React.FC = () => {
   );
 };
 
-export default StyleBuilderSearchPage;
+export default StyleBuilderPage;

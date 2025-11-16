@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "start:all": "concurrently --names \"[AI],   [BACKEND], [UI]\" --prefix \"[{name}]\" --prefix-colors \"cyan,blue,green\" --kill-others \"npm run start:ai\" \"npm run start:backend\" \"npm run start:frontend\"",
-    "start:ai": "cd ai && .venv\\Scripts\\python.exe ai_api.py",
+    "start:ai": ".venv\\Scripts\\python.exe ai\\ai_api.py",
     "start:backend": "cd backend && node main_api_server.js",
     "start:frontend": "cd frontend && npm run dev",
     "install:all": "cd backend && npm install && cd ../frontend && npm install && cd ..",

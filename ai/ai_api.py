@@ -1,171 +1,176 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+"""
+AI Style Builder API
+Provides outfit recommendations using cosine similarity on CLIP embeddings
+"""
 
-import os
-from flask import Flask, jsonify, abort
+from flask import Flask, jsonify
 from flask_cors import CORS
-import pymongo
+from pymongo import MongoClient
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
-from bson import ObjectId
-from dotenv import load_dotenv
-
-# Load env variables
-load_dotenv()
-
-# ---------------------------- CONFIG ----------------------------
-
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017")
-DB_NAME = os.getenv("DB_NAME", "value_scout")
-COLLECTION_NAME = os.getenv("COLLECTION_NAME", "products")
-FLASK_PORT = int(os.getenv("FLASK_PORT", 5000))
-FLASK_ENV = os.getenv("FLASK_ENV", "development")
 
 app = Flask(__name__)
 CORS(app)
 
-# ---------------------------- DB CONNECTION ----------------------
+# MongoDB Connection
+client = MongoClient("mongodb://localhost:27017/")
+db = client["value_scout"]
+products_collection = db["products"]
 
-try:
-    client = pymongo.MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
-    client.admin.command("ping")
-    print("[AI] MongoDB connection successful")
-    db = client[DB_NAME]
-    products = db[COLLECTION_NAME]
-except Exception as e:
-    print(f"[AI] ERROR connecting to MongoDB: {e}")
-    products = None
-
-# ---------------------------- OUTFIT RULES -----------------------
-
+# Outfit Category Rules
+# Maps a product category to compatible categories for outfit building
 OUTFIT_RULES = {
-    "shoes": ["pants", "tshirt", "jacket"],
-    "tshirt": ["pants", "shoes"],
-    "pants": ["tshirt", "shoes"],
-    "jacket": ["tshirt", "pants"],
-    "sneakers": ["pants", "tshirt"],
-    "default": ["tshirt", "pants", "shoes", "jacket"]
+    "shoes": ["tshirt", "shirt", "pants", "jeans", "hoodie", "jacket"],
+    "tshirt": ["pants", "jeans", "shoes"],
+    "shirt": ["pants", "jeans", "shoes"],
+    "hoodie": ["pants", "jeans", "shoes"],
+    "jacket": ["pants", "jeans", "shoes", "tshirt", "shirt"],
+    "pants": ["tshirt", "shirt", "hoodie", "jacket", "shoes"],
+    "jeans": ["tshirt", "shirt", "hoodie", "jacket", "shoes"],
 }
 
-def get_target_categories(category):
-    category = (category or "").lower()
-    return OUTFIT_RULES.get(category, OUTFIT_RULES["default"])
-
-# ---------------------------- ROUTES -----------------------------
-
-@app.route("/health", methods=["GET"])
-def health():
-    """Simple health endpoint."""
+@app.route('/api/style-builder/<product_id>', methods=['GET'])
+def get_style_recommendations(product_id):
+    """
+    Get AI-powered outfit recommendations for a product
+    Returns top 5 matching items based on style similarity
+    """
     try:
-        client.admin.command("ping")
-        return jsonify({"status": "ok"}), 200
-    except Exception as e:
-        return jsonify({"status": "mongo-error", "error": str(e)}), 500
-
-
-@app.route("/api/style-builder/<product_id>", methods=["GET"])
-def style_builder(product_id):
-    """Merged version of your simple code + enterprise logic."""
-    
-    try:
-        print(f"[AI] Style builder request for product_id: {product_id}")
-
-        if products is None:
-            abort(500, "Database not initialized")
-
-        # Allow both ObjectId and string IDs
-        try:
-            if ObjectId.is_valid(product_id):
-                query = {"_id": ObjectId(product_id)}
-            else:
-                query = {"_id": product_id}
-        except Exception as e:
-            print(f"[AI] Error parsing product_id: {e}")
-            query = {"_id": product_id}
-
-        # 1. Get base product
-        base = products.find_one(query)
-        if not base:
-            print(f"[AI] Product not found: {product_id}")
-            abort(404, description="Product not found")
-
-        if "styleEmbedding" not in base:
-            print(f"[AI] No embedding for product: {product_id}")
-            abort(400, description="No embedding for this product")
-
-        # Turn into numpy vector
-        try:
-            input_embed = np.array(base["styleEmbedding"], dtype=float).reshape(1, -1)
-        except Exception as e:
-            print(f"[AI] Invalid embedding format: {e}")
-            abort(500, "Invalid embedding format")
-
-        # 2. Determine target categories
-        target_categories = get_target_categories(base.get("category", ""))
-        print(f"[AI] Target categories: {target_categories}")
-
-        # 3. Fetch candidate items
-        cursor = products.find(
+        # STEP 1: Load input product
+        input_product = products_collection.find_one({"_id": product_id})
+        
+        if not input_product:
+            return jsonify({
+                "error": "Product not found",
+                "product_id": product_id
+            }), 404
+        
+        # Check if product has embedding
+        if "styleEmbedding" not in input_product:
+            return jsonify({
+                "error": "Product has no style embedding",
+                "product_id": product_id,
+                "message": "Run process_embeddings.py first"
+            }), 400
+        
+        # STEP 2: Get input embedding
+        input_embedding = np.array(input_product["styleEmbedding"]).reshape(1, -1)
+        input_category = input_product.get("category", "clothing")
+        
+        # STEP 3: Determine target categories
+        target_categories = OUTFIT_RULES.get(input_category, [])
+        
+        if not target_categories:
+            return jsonify({
+                "error": "No outfit rules for this category",
+                "category": input_category,
+                "available_categories": list(OUTFIT_RULES.keys())
+            }), 400
+        
+        # STEP 4: Query candidate products
+        cursor = products_collection.find(
             {
                 "category": {"$in": target_categories},
-                "styleEmbedding": {"$exists": True}
+                "styleEmbedding": {"$exists": True},
+                "_id": {"$ne": product_id}  # Exclude input product
             },
-            {"_id": 1, "styleEmbedding": 1}
+            {
+                "_id": 1,
+                "styleEmbedding": 1
+            }
         )
-
+        
+        # STEP 5: Build candidate lists
         candidate_ids = []
-        candidate_embeds = []
-
-        for doc in cursor:
-            emb = doc.get("styleEmbedding")
-            if not emb:
-                continue
-            try:
-                candidate_ids.append(str(doc["_id"]))
-                candidate_embeds.append(np.array(emb, dtype=float))
-            except Exception:
-                continue
-
-        print(f"[AI] Found {len(candidate_embeds)} candidate products")
-
-        if not candidate_embeds:
-            return jsonify({"recommendations": []})
-
-        # 4. Compute cosine similarity
-        matrix = np.vstack(candidate_embeds)
-        sims = cosine_similarity(input_embed, matrix)[0]
-
-        # 5. Build sorted result
-        pairs = [{"id": cid, "score": float(score)} for cid, score in zip(candidate_ids, sims)]
-
-        # Remove itself
-        pairs = [p for p in pairs if p["id"] != str(base["_id"])]
-
-        # Sort desc
-        pairs.sort(key=lambda x: x["score"], reverse=True)
-
-        print(f"[AI] Returning {len(pairs[:5])} recommendations")
-
-        # Return top 5
-        return jsonify({"recommendations": pairs[:5]})
-    
+        candidate_embeddings = []
+        
+        for candidate in cursor:
+            candidate_ids.append(candidate["_id"])
+            candidate_embeddings.append(candidate["styleEmbedding"])
+        
+        if len(candidate_ids) == 0:
+            return jsonify({
+                "error": "No matching products found",
+                "input_category": input_category,
+                "target_categories": target_categories,
+                "message": "Try scraping more products or generating more embeddings"
+            }), 404
+        
+        # STEP 6: Convert to numpy array
+        candidate_embeddings = np.array(candidate_embeddings)
+        
+        # STEP 7: Calculate cosine similarity
+        similarities = cosine_similarity(input_embedding, candidate_embeddings)[0]
+        
+        # STEP 8: Sort by similarity (descending)
+        sorted_indices = np.argsort(similarities)[::-1]
+        
+        # STEP 9: Get top 5 results
+        top_5_results = []
+        for idx in sorted_indices[:5]:
+            top_5_results.append({
+                "id": candidate_ids[idx],
+                "score": float(similarities[idx])  # Convert numpy float to Python float
+            })
+        
+        # STEP 10: Return results
+        return jsonify({
+            "input_product_id": product_id,
+            "input_category": input_category,
+            "target_categories": target_categories,
+            "total_candidates": len(candidate_ids),
+            "recommendations": top_5_results
+        }), 200
+        
     except Exception as e:
-        print(f"[AI] EXCEPTION in style_builder: {type(e).__name__}: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({
+            "error": "Internal server error",
+            "message": str(e)
+        }), 500
 
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """Health check endpoint"""
+    try:
+        # Check MongoDB connection
+        products_count = products_collection.count_documents({})
+        embeddings_count = products_collection.count_documents({"styleEmbedding": {"$exists": True}})
+        
+        return jsonify({
+            "status": "healthy",
+            "database": "connected",
+            "total_products": products_count,
+            "products_with_embeddings": embeddings_count,
+            "embedding_coverage": f"{(embeddings_count/products_count*100):.1f}%" if products_count > 0 else "0%"
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "status": "unhealthy",
+            "error": str(e)
+        }), 500
 
-# ---------------------------- GLOBAL ERROR HANDLER ----------------------------
+@app.route('/', methods=['GET'])
+def root():
+    """API documentation"""
+    return jsonify({
+        "name": "AI Style Builder API",
+        "version": "1.0",
+        "endpoints": {
+            "GET /api/style-builder/<product_id>": "Get outfit recommendations for a product",
+            "GET /api/health": "Check API health and database stats",
+            "GET /": "This documentation"
+        },
+        "outfit_rules": OUTFIT_RULES
+    }), 200
 
-@app.errorhandler(Exception)
-def error_handler(e):
-    code = getattr(e, "code", 500)
-    return jsonify({"error": str(e)}), code
-
-
-# ---------------------------- START SERVER ----------------------------
-
-if __name__ == "__main__":
-    print(f"[AI] Starting AI API on port {FLASK_PORT}...")
-    app.run(host="0.0.0.0", port=FLASK_PORT, debug=(FLASK_ENV == "development"), use_reloader=False)
+if __name__ == '__main__':
+    print("\n" + "="*60)
+    print("AI Style Builder API")
+    print("="*60)
+    print("Server starting on http://localhost:5000")
+    print("\nEndpoints:")
+    print("  GET /api/style-builder/<product_id>")
+    print("  GET /api/health")
+    print("="*60 + "\n")
+    
+    app.run(host='0.0.0.0', port=5000, debug=True)

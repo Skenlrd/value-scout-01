@@ -3,3 +3,17 @@
 dist/
 __pycache__/
 *.pyc
+
+# Python virtual environment
+.venv/
+venv/
+env/
+
+# Large files
+*.dll
+*.so
+*.dylib
+
+# IDEs
+.vscode/
+.idea/

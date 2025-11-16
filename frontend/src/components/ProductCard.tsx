@@ -96,7 +96,7 @@ const AIStyleBuilderModalContent: React.FC<AIStyleBuilderModalContentProps> = ({
 
       try {
         // Call 1 → AI API
-        const resp1 = await fetch(`/api/style-builder/${encodeURIComponent(baseProductId)}`);
+        const resp1 = await fetch(`http://localhost:8000/api/style-builder/${encodeURIComponent(baseProductId)}`);
         if (!resp1.ok) throw new Error("AI API error: " + resp1.status);
 
         const recData = await resp1.json();
@@ -111,7 +111,7 @@ const AIStyleBuilderModalContent: React.FC<AIStyleBuilderModalContentProps> = ({
         }
 
         // Call 2 → Node products-by-ids
-        const resp2 = await fetch(`/api/products-by-ids?ids=${ids.join(",")}`);
+        const resp2 = await fetch(`http://localhost:8000/api/products-by-ids?ids=${ids.join(",")}`);
         if (!resp2.ok) throw new Error("Node API error: " + resp2.status);
 
         const fullProducts = await resp2.json();

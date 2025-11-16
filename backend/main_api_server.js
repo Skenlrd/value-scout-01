@@ -49,14 +49,25 @@ app.get("/", (req, res) => {
 // 1️⃣ AI STYLE BUILDER → PROXY TO PYTHON API
 // -----------------------------
 app.get("/api/style-builder/:productId", async (req, res) => {
-  const aiApiUrl = `${process.env.AI_API_URL}/api/style-builder/${req.params.productId}`;
+  const productId = req.params.productId;
+  const aiApiUrl = `${process.env.AI_API_URL}/api/style-builder/${productId}`;
+  
+  console.log(`[BACKEND] Style builder request for productId: ${productId}`);
+  console.log(`[BACKEND] Calling AI API: ${aiApiUrl}`);
 
   try {
     const response = await axios.get(aiApiUrl);
+    console.log(`[BACKEND] AI API response status: ${response.status}`);
     res.json(response.data);
   } catch (error) {
     console.error("⚠️ AI API error:", error.message);
-    res.status(500).json({ error: "AI service unavailable" });
+    if (error.response) {
+      console.error(`[BACKEND] AI API error status: ${error.response.status}`);
+      console.error(`[BACKEND] AI API error data:`, error.response.data);
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res.status(500).json({ error: "AI service unavailable" });
+    }
   }
 });
 

@@ -66,70 +66,94 @@ def health():
 @app.route("/api/style-builder/<product_id>", methods=["GET"])
 def style_builder(product_id):
     """Merged version of your simple code + enterprise logic."""
-
-    if products is None:
-        abort(500, "Database not initialized")
-
-    # Allow both ObjectId and string IDs
-    query = {"_id": ObjectId(product_id)} if ObjectId.is_valid(product_id) else {"_id": product_id}
-
-    # 1. Get base product
-    base = products.find_one(query)
-    if not base:
-        abort(404, description="Product not found")
-
-    if "styleEmbedding" not in base:
-        abort(400, description="No embedding for this product")
-
-    # Turn into numpy vector
+    
     try:
-        input_embed = np.array(base["styleEmbedding"], dtype=float).reshape(1, -1)
-    except Exception:
-        abort(500, "Invalid embedding format")
+        print(f"[AI] Style builder request for product_id: {product_id}")
 
-    # 2. Determine target categories
-    target_categories = get_target_categories(base.get("category", ""))
+        if products is None:
+            abort(500, "Database not initialized")
 
-    # 3. Fetch candidate items
-    cursor = products.find(
-        {
-            "category": {"$in": target_categories},
-            "styleEmbedding": {"$exists": True}
-        },
-        {"_id": 1, "styleEmbedding": 1}
-    )
-
-    candidate_ids = []
-    candidate_embeds = []
-
-    for doc in cursor:
-        emb = doc.get("styleEmbedding")
-        if not emb:
-            continue
+        # Allow both ObjectId and string IDs
         try:
-            candidate_ids.append(str(doc["_id"]))
-            candidate_embeds.append(np.array(emb, dtype=float))
-        except Exception:
-            continue
+            if ObjectId.is_valid(product_id):
+                query = {"_id": ObjectId(product_id)}
+            else:
+                query = {"_id": product_id}
+        except Exception as e:
+            print(f"[AI] Error parsing product_id: {e}")
+            query = {"_id": product_id}
 
-    if not candidate_embeds:
-        return jsonify({"recommendations": []})
+        # 1. Get base product
+        base = products.find_one(query)
+        if not base:
+            print(f"[AI] Product not found: {product_id}")
+            abort(404, description="Product not found")
 
-    # 4. Compute cosine similarity
-    matrix = np.vstack(candidate_embeds)
-    sims = cosine_similarity(input_embed, matrix)[0]
+        if "styleEmbedding" not in base:
+            print(f"[AI] No embedding for product: {product_id}")
+            abort(400, description="No embedding for this product")
 
-    # 5. Build sorted result
-    pairs = [{"id": cid, "score": float(score)} for cid, score in zip(candidate_ids, sims)]
+        # Turn into numpy vector
+        try:
+            input_embed = np.array(base["styleEmbedding"], dtype=float).reshape(1, -1)
+        except Exception as e:
+            print(f"[AI] Invalid embedding format: {e}")
+            abort(500, "Invalid embedding format")
 
-    # Remove itself
-    pairs = [p for p in pairs if p["id"] != str(base["_id"])]
+        # 2. Determine target categories
+        target_categories = get_target_categories(base.get("category", ""))
+        print(f"[AI] Target categories: {target_categories}")
 
-    # Sort desc
-    pairs.sort(key=lambda x: x["score"], reverse=True)
+        # 3. Fetch candidate items
+        cursor = products.find(
+            {
+                "category": {"$in": target_categories},
+                "styleEmbedding": {"$exists": True}
+            },
+            {"_id": 1, "styleEmbedding": 1}
+        )
 
-    # Return top 5
-    return jsonify({"recommendations": pairs[:5]})
+        candidate_ids = []
+        candidate_embeds = []
+
+        for doc in cursor:
+            emb = doc.get("styleEmbedding")
+            if not emb:
+                continue
+            try:
+                candidate_ids.append(str(doc["_id"]))
+                candidate_embeds.append(np.array(emb, dtype=float))
+            except Exception:
+                continue
+
+        print(f"[AI] Found {len(candidate_embeds)} candidate products")
+
+        if not candidate_embeds:
+            return jsonify({"recommendations": []})
+
+        # 4. Compute cosine similarity
+        matrix = np.vstack(candidate_embeds)
+        sims = cosine_similarity(input_embed, matrix)[0]
+
+        # 5. Build sorted result
+        pairs = [{"id": cid, "score": float(score)} for cid, score in zip(candidate_ids, sims)]
+
+        # Remove itself
+        pairs = [p for p in pairs if p["id"] != str(base["_id"])]
+
+        # Sort desc
+        pairs.sort(key=lambda x: x["score"], reverse=True)
+
+        print(f"[AI] Returning {len(pairs[:5])} recommendations")
+
+        # Return top 5
+        return jsonify({"recommendations": pairs[:5]})
+    
+    except Exception as e:
+        print(f"[AI] EXCEPTION in style_builder: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 
 # ---------------------------- GLOBAL ERROR HANDLER ----------------------------

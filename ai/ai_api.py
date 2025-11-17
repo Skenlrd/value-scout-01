@@ -20,13 +20,14 @@ products_collection = db["products"]
 # Outfit Category Rules
 # Maps a product category to compatible categories for outfit building
 OUTFIT_RULES = {
-    "shoes": ["tshirt", "shirt", "pants", "jeans", "hoodie", "jacket"],
-    "tshirt": ["pants", "jeans", "shoes"],
-    "shirt": ["pants", "jeans", "shoes"],
-    "hoodie": ["pants", "jeans", "shoes"],
-    "jacket": ["pants", "jeans", "shoes", "tshirt", "shirt"],
+    "shoes": ["tshirt", "shirt", "pants", "jeans", "shorts", "hoodie", "jacket"],
+    "tshirt": ["pants", "jeans", "shorts", "shoes"],
+    "shirt": ["pants", "jeans", "shorts", "shoes"],
+    "hoodie": ["pants", "jeans", "shorts", "shoes"],
+    "jacket": ["pants", "jeans", "shorts", "shoes", "tshirt", "shirt"],
     "pants": ["tshirt", "shirt", "hoodie", "jacket", "shoes"],
     "jeans": ["tshirt", "shirt", "hoodie", "jacket", "shoes"],
+    "shorts": ["tshirt", "shirt", "hoodie", "jacket", "shoes"],
 }
 
 @app.route('/api/style-builder/<product_id>', methods=['GET'])

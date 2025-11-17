@@ -6,6 +6,7 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardFooter } from "./ui/card";
 import { Skeleton } from "./ui/skeleton";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 
 interface ProductCardProps {
   productId: string;
@@ -65,7 +66,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
         </Card>
       </div>
 
-      <DialogContent>
+      <DialogContent className="sm:max-w-4xl w-[95vw] p-6">
         <AIStyleBuilderModalContent baseProductId={productId} />
       </DialogContent>
     </Dialog>
@@ -85,6 +86,9 @@ const AIStyleBuilderModalContent: React.FC<AIStyleBuilderModalContentProps> = ({
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [recommendedProducts, setRecommendedProducts] = useState<any[]>([]);
+  const [targetCategories, setTargetCategories] = useState<string[]>([]);
+  const [baseCategory, setBaseCategory] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<string>("all");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -101,6 +105,12 @@ const AIStyleBuilderModalContent: React.FC<AIStyleBuilderModalContentProps> = ({
 
         const recData = await resp1.json();
         const ids = recData.recommendations?.map((r: any) => r.id) || [];
+        const targets: string[] = Array.isArray(recData.target_categories) ? recData.target_categories : [];
+        const inputCat: string = (recData.input_category || "").toLowerCase();
+        if (!cancelled) {
+          setTargetCategories(targets);
+          setBaseCategory(inputCat);
+        }
 
         if (ids.length === 0) {
           if (!cancelled) {
@@ -114,7 +124,21 @@ const AIStyleBuilderModalContent: React.FC<AIStyleBuilderModalContentProps> = ({
         const resp2 = await fetch(`http://localhost:8000/api/products-by-ids?ids=${ids.join(",")}`);
         if (!resp2.ok) throw new Error("Node API error: " + resp2.status);
 
-        const fullProducts = await resp2.json();
+        let fullProducts = await resp2.json();
+
+        // Safety filter: keep only products in target categories
+        if (targets && targets.length) {
+          fullProducts = fullProducts.filter((p: any) => targets.includes((p.category || "").toLowerCase()));
+        }
+
+        // De-duplicate by productUrl to avoid repeats
+        const seen = new Set<string>();
+        fullProducts = fullProducts.filter((p: any) => {
+          const key = (p.productUrl || p._id);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
 
         if (!cancelled) {
           setRecommendedProducts(fullProducts);
@@ -137,8 +161,13 @@ const AIStyleBuilderModalContent: React.FC<AIStyleBuilderModalContentProps> = ({
 
 
   return (
-    <div style={{ padding: 16, minWidth: 320 }}>
-      <h3 style={{ fontSize: 20, fontWeight: 600 }}>AI Style Suggestions</h3>
+    <div style={{ padding: 8 }}>
+      <h3 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>AI Style Suggestions</h3>
+      {baseCategory && (
+        <div style={{ marginBottom: 12, fontSize: 13, color: "#555" }}>
+          Base product category: <strong style={{ textTransform: "capitalize" }}>{baseCategory}</strong>
+        </div>
+      )}
 
       {isLoading ? (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
@@ -154,25 +183,59 @@ const AIStyleBuilderModalContent: React.FC<AIStyleBuilderModalContentProps> = ({
       ) : recommendedProducts.length === 0 ? (
         <div>No recommendations found.</div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
+        (() => {
+          // Derive categories present in results (filtered by targetCategories if provided)
+          const presentCats = Array.from(
+            new Set(
+              recommendedProducts
+                .map((p) => (p.category || "").toLowerCase())
+                .filter((c) => c && (!targetCategories.length || targetCategories.includes(c)))
+            )
+          );
+          const tabs = ["all", ...presentCats];
+          if (!tabs.includes(activeTab)) setActiveTab("all");
 
-          {recommendedProducts.map((p) => (
-            <div key={p._id} style={{ border: "1px solid #eee", padding: 8, borderRadius: 6 }}>
-              <a href={p.productUrl} target="_blank" rel="noreferrer" style={{ textDecoration: "none", color: "inherit" }}>
-                <div style={{ width: "100%", height: 140, background: "#fafafa", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {p.imageUrl 
-                    ? <img src={p.imageUrl} alt={p.productName || p.name} style={{ maxWidth: "100%", maxHeight: "100%" }} />
-                    : <Skeleton style={{ height: 140 }} />
-                  }
+          const renderItems = (items: any[]) => (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
+              {items.map((p) => (
+                <div key={p._id} style={{ border: "1px solid #eee", padding: 12, borderRadius: 8 }}>
+                  <a href={p.productUrl} target="_blank" rel="noreferrer" style={{ textDecoration: "none", color: "inherit" }}>
+                    <div style={{ width: "100%", height: 200, background: "#fafafa", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {p.imageUrl ? (
+                        <img src={p.imageUrl} alt={p.productName || p.name} style={{ maxWidth: "100%", maxHeight: "100%" }} />
+                      ) : (
+                        <Skeleton style={{ height: 200 }} />
+                      )}
+                    </div>
+                    <div style={{ marginTop: 10, fontWeight: 600 }}>{p.productName || p.name}</div>
+                    <div style={{ marginTop: 6, color: "#666" }}>{formatPrice(p.price)}</div>
+                  </a>
                 </div>
-
-                <div style={{ marginTop: 8, fontWeight: 600 }}>{p.productName || p.name}</div>
-                <div style={{ marginTop: 4, color: "#666" }}>{formatPrice(p.price)}</div>
-              </a>
+              ))}
             </div>
-          ))}
+          );
 
-        </div>
+          return (
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="flex flex-wrap gap-2 mb-4 bg-transparent p-0">
+                {tabs.map((t) => (
+                  <TabsTrigger key={t} value={t} className="capitalize">
+                    {t === "all" ? "All" : t}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              {tabs.map((t) => (
+                <TabsContent key={t} value={t}>
+                  {renderItems(
+                    t === "all"
+                      ? recommendedProducts
+                      : recommendedProducts.filter((p) => (p.category || "").toLowerCase() === t)
+                  )}
+                </TabsContent>
+              ))}
+            </Tabs>
+          );
+        })()
       )}
 
     </div>

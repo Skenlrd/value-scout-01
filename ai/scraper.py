@@ -16,7 +16,7 @@ products = db["products"]
 CHECKPOINT_FILE = "scraper_checkpoint.json"
 
 # Brand whitelist (lowercase)
-ALLOWED_BRANDS = {"h&m", "hm", "nike", "snitch", "superkicks", "vegnonveg"}
+ALLOWED_BRANDS = {"h&m", "hm", "nike", "snitch", "mango", "superkicks", "vegnonveg"}
 
 
 def load_checkpoint():
@@ -86,26 +86,21 @@ def get_context(browser):
 
 
 # =============================================================
-# Myntra brand scraper (men focus, with Nike shoes)
+# Myntra brand scraper (men & women, all clothing)
 # =============================================================
-def scrape_myntra_brand(brand: str, target: int, include_shoes=False):
+def scrape_myntra_brand(brand: str, target: int):
     print("\n" + "=" * 60)
-    print(f"🔍 Myntra: {brand} (target {target}+)" )
+    print(f"🔍 Myntra: {brand} (target {target}+)")
     print("=" * 60)
 
     cp = load_checkpoint()
     total = 0
+    
+    # Scrape men and women general listings
     queries = [
-        f"{brand}-men-tshirts",
-        f"{brand}-men-shirts",
-        f"{brand}-men-jeans",
-        f"{brand}-men-trousers",
-        f"{brand}-men-hoodies",
-        f"{brand}-men-sweaters",
-        f"{brand}-men-jackets",
+        f"{brand}-men",
+        f"{brand}-women"
     ]
-    if include_shoes:
-        queries += [f"{brand}-men-shoes", f"{brand}-men-sneakers", f"{brand}-men-sports-shoes"]
 
     with sync_playwright() as p:
         browser = get_browser(p)
@@ -117,7 +112,7 @@ def scrape_myntra_brand(brand: str, target: int, include_shoes=False):
             empty_pages = 0
             seen_in_cat = set()
 
-            while page_num <= 60 and total < target:
+            while page_num <= 100 and total < target:
                 url = f"https://www.myntra.com/{q}?p={page_num}"
                 print(f"➡ {q} | page {page_num}")
                 try:
@@ -127,18 +122,23 @@ def scrape_myntra_brand(brand: str, target: int, include_shoes=False):
                     print(f"  ❌ Load error: {e}")
                     empty_pages += 1
                     if empty_pages >= 3:
+                        print(f"  🛑 Stopping - 3 consecutive empty pages")
                         break
                     page_num += 1
                     continue
 
                 cards = page.query_selector_all("li.product-base")
-                if not cards:
+                if not cards or len(cards) == 0:
                     empty_pages += 1
                     print(f"  ⚠️ Empty page ({empty_pages}/3)")
                     if empty_pages >= 3:
+                        print(f"  🛑 Stopping - 3 consecutive empty pages")
                         break
                     page_num += 1
                     continue
+                
+                # Reset empty counter if we found products
+                empty_pages = 0
 
                 added = 0
                 for it in cards:
@@ -155,6 +155,8 @@ def scrape_myntra_brand(brand: str, target: int, include_shoes=False):
                         a_el = it.query_selector("a")
                         href = a_el.get_attribute("href") if a_el else ""
                         if href and not href.startswith("http"):
+                            if not href.startswith("/"):
+                                href = "/" + href
                             href = "https://www.myntra.com" + href
                         if not href or href in seen_in_cat:
                             continue
@@ -164,28 +166,45 @@ def scrape_myntra_brand(brand: str, target: int, include_shoes=False):
                         img = img_el.get_attribute("src") if img_el else ""
                         if img and img.startswith("//"):
                             img = "https:" + img
+                        # Skip products with no image
+                        if not img or "placeholder" in img.lower():
+                            continue
 
                         price_el = it.query_selector(".product-discountedPrice, .product-price")
                         price_txt = price_el.inner_text().strip() if price_el else "0"
-                        # normalize integer price if possible
-                        digits = ''.join(ch for ch in price_txt if ch.isdigit()) or "0"
-                        price = int(digits)
+                        # Extract price more carefully - only get the first continuous digit group
+                        import re
+                        price_match = re.search(r'₹?\s*(\d{1,6})', price_txt)
+                        price = int(price_match.group(1)) if price_match else 0
+                        # Sanity check: skip if price is unrealistic
+                        if price > 50000:
+                            continue
 
-                        # category guess from query
-                        ql = q.lower()
+                        # Auto-detect category from URL/name (improved ordering & keywords to reduce mislabels)
+                        url_lower = href.lower()
+                        name_lower = ntxt.lower()
                         category = "clothing"
-                        if "tshirt" in ql:
-                            category = "tshirt"
-                        elif "shirt" in ql and "tshirt" not in ql:
-                            category = "shirt"
-                        elif any(x in ql for x in ["jeans", "trouser"]):
-                            category = "pants"
-                        elif "hoodie" in ql:
-                            category = "hoodie"
-                        elif "jacket" in ql:
-                            category = "jacket"
-                        elif any(x in ql for x in ["shoe", "sneaker"]):
+
+                        # Shoes first: broaden keyword set (avoid misclassifying performance footwear as shirts)
+                        shoe_kw = ["shoe", "shoes", "sneaker", "sneakers", "boot", "trainer", "basketball", "running", "football", "golf", "court", "jordan"]
+                        if any(k in url_lower or k in name_lower for k in shoe_kw):
                             category = "shoes"
+                        elif any(x in url_lower or x in name_lower for x in ["tshirt", "t-shirt"]):
+                            category = "tshirt"
+                        elif any(x in url_lower or x in name_lower for x in ["shirt", "shirts", "top", "blouse"]):
+                            # ensure we don't wrongly match 'short' as 'shirt'
+                            if "short" not in name_lower:
+                                category = "shirt"
+                        elif any(x in url_lower or x in name_lower for x in ["jeans", "trouser", "pant"]):
+                            category = "pants"
+                        elif any(x in url_lower or x in name_lower for x in ["short", "shorts"]):
+                            category = "shorts"
+                        elif any(x in url_lower or x in name_lower for x in ["hoodie", "sweatshirt"]):
+                            category = "hoodie"
+                        elif any(x in url_lower or x in name_lower for x in ["jacket", "coat"]):
+                            category = "jacket"
+                        elif any(x in url_lower or x in name_lower for x in ["dress", "skirt"]):
+                            category = "dress"
 
                         doc = {
                             "_id": gen_id("myntra", href),
@@ -205,7 +224,12 @@ def scrape_myntra_brand(brand: str, target: int, include_shoes=False):
                         print(f"  ⚠️ Parse error: {e}")
                         continue
 
-                print(f"  ✅ +{added} (brand total: {total})")
+                print(f"  ✅ +{added} (total: {total})")
+                if added == 0:
+                    empty_pages += 1
+                    if empty_pages >= 3:
+                        print(f"  🛑 Stopping - no new products found")
+                        break
                 page_num += 1
                 rand_sleep()
 
@@ -217,15 +241,19 @@ def scrape_myntra_brand(brand: str, target: int, include_shoes=False):
 
 
 def scrape_myntra_hm():
-    return scrape_myntra_brand("H&M", target=1500, include_shoes=False)
+    return scrape_myntra_brand("H&M", target=1500)
 
 
 def scrape_myntra_nike():
-    return scrape_myntra_brand("Nike", target=500, include_shoes=True)
+    return scrape_myntra_brand("Nike", target=500)
 
 
 def scrape_myntra_snitch():
-    return scrape_myntra_brand("Snitch", target=500, include_shoes=False)
+    return scrape_myntra_brand("Snitch", target=500)
+
+
+def scrape_myntra_mango():
+    return scrape_myntra_brand("Mango", target=500)
 
 
 # =============================================================
@@ -286,12 +314,20 @@ def scrape_superkicks():
                     name = name_el.inner_text().strip()
                     href = a_el.get_attribute("href") or ""
                     if href and not href.startswith("http"):
+                        if not href.startswith("/"):
+                            href = "/" + href
                         href = "https://www.superkicks.in" + href
                     img = img_el.get_attribute("src") or img_el.get_attribute("data-src") or ""
                     if img.startswith("//"):
                         img = "https:" + img
-                    digits = ''.join(ch for ch in (price_el.inner_text() or "") if ch.isdigit()) or "0"
-                    price = int(digits)
+                    if not img or "placeholder" in img.lower():
+                        continue
+                    import re
+                    price_txt = price_el.inner_text() or "0"
+                    price_match = re.search(r'₹?\s*(\d{1,6})', price_txt)
+                    price = int(price_match.group(1)) if price_match else 0
+                    if price > 50000:
+                        continue
 
                     doc = {
                         "_id": gen_id("superkicks", href),
@@ -312,6 +348,13 @@ def scrape_superkicks():
                     continue
 
             print(f"  ✅ +{added} (site total: {total})")
+            if added == 0:
+                empty_pages += 1
+                if empty_pages >= 3:
+                    print(f"  🛑 Stopping - no new products found")
+                    break
+            else:
+                empty_pages = 0
             page_num += 1
             rand_sleep()
 
@@ -379,12 +422,20 @@ def scrape_vegnonveg():
                     name = name_el.inner_text().strip()
                     href = a_el.get_attribute("href") or ""
                     if href and not href.startswith("http"):
+                        if not href.startswith("/"):
+                            href = "/" + href
                         href = "https://www.vegnonveg.com" + href
                     img = img_el.get_attribute("src") or img_el.get_attribute("data-src") or ""
                     if img.startswith("//"):
                         img = "https:" + img
-                    digits = ''.join(ch for ch in (price_el.inner_text() or "") if ch.isdigit()) or "0"
-                    price = int(digits)
+                    if not img or "placeholder" in img.lower():
+                        continue
+                    import re
+                    price_txt = price_el.inner_text() or "0"
+                    price_match = re.search(r'₹?\s*(\d{1,6})', price_txt)
+                    price = int(price_match.group(1)) if price_match else 0
+                    if price > 50000:
+                        continue
 
                     doc = {
                         "_id": gen_id("vegnonveg", href),
@@ -405,6 +456,13 @@ def scrape_vegnonveg():
                     continue
 
             print(f"  ✅ +{added} (site total: {total})")
+            if added == 0:
+                empty_pages += 1
+                if empty_pages >= 3:
+                    print(f"  🛑 Stopping - no new products found")
+                    break
+            else:
+                empty_pages = 0
             page_num += 1
             rand_sleep()
 
@@ -436,6 +494,7 @@ def run_all_scrapers():
     res["H&M"] = scrape_myntra_hm()
     res["Nike"] = scrape_myntra_nike()
     res["Snitch"] = scrape_myntra_snitch()
+    res["Mango"] = scrape_myntra_mango()
     res["SuperKicks"] = scrape_superkicks()
     res["VegNonVeg"] = scrape_vegnonveg()
 
@@ -448,6 +507,7 @@ def run_all_scrapers():
     print(f"H&M (Myntra):    {res['H&M']}")
     print(f"Nike (Myntra):   {res['Nike']}")
     print(f"Snitch (Myntra): {res['Snitch']}")
+    print(f"Mango (Myntra):  {res['Mango']}")
     print(f"SuperKicks:      {res['SuperKicks']}")
     print(f"VegNonVeg:       {res['VegNonVeg']}")
     print("-" * 60)
@@ -473,6 +533,12 @@ def run_all_scrapers():
         ok = False
     else:
         print("  ✅ Snitch target met")
+
+    if res["Mango"] < 500:
+        print(f"  ⚠️ Mango below target (got {res['Mango']}, need 500+)")
+        ok = False
+    else:
+        print("  ✅ Mango target met")
 
     if total_shoes < 1000:
         print(f"  ⚠️ Shoes below target (got {total_shoes}, need 1000+)")

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Wand2 } from "lucide-react";
+import { Wand2, Heart, ExternalLink } from "lucide-react";
 
 import { Dialog, DialogTrigger, DialogContent } from "./ui/dialog";
 import { Badge } from "./ui/badge";
@@ -16,6 +16,9 @@ interface ProductCardProps {
   imageUrl?: string;
   productUrl?: string;
   source?: string;
+  onWishlistToggle?: (product: any) => void;
+  isInWishlist?: boolean;
+  asin?: string;
 }
 
 const formatPrice = (val?: number | string) => {
@@ -27,41 +30,118 @@ const formatPrice = (val?: number | string) => {
 };
 
 const ProductCard: React.FC<ProductCardProps> = ({ 
-  productId, productName, name, price, imageUrl, productUrl, source 
+  productId, productName, name, price, imageUrl, productUrl, source, onWishlistToggle, isInWishlist, asin
 }) => {
   
   const displayName = productName ?? name ?? "";
   const [open, setOpen] = useState(false);
 
+  const handleWishlistClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onWishlistToggle) {
+      onWishlistToggle({
+        asin,
+        title: displayName,
+        price: price,
+        source: source,
+        link: productUrl,
+        image: imageUrl
+      });
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <div>
-        <Card style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-          <a href={productUrl} target="_blank" rel="noreferrer" style={{ textDecoration: "none", color: "inherit" }}>
-
-            <div style={{ width: "100%", height: 220, backgroundColor: "#f3f3f3", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div className="group cursor-pointer h-full">
+        <Card className="flex flex-col h-full overflow-hidden hover:shadow-lg transition-shadow">
+          {/* Image Section - Clickable */}
+          <a 
+            href={productUrl || "#"} 
+            target="_blank" 
+            rel="noreferrer" 
+            className="flex-shrink-0 overflow-hidden"
+            onClick={(e) => {
+              if (!productUrl) {
+                e.preventDefault();
+              }
+            }}
+          >
+            <div className="w-full h-56 bg-gray-100 flex items-center justify-center overflow-hidden group-hover:scale-105 transition-transform">
               {imageUrl ? (
-                <img src={imageUrl} alt={displayName} style={{ maxWidth: "100%", maxHeight: "100%" }} />
+                <img 
+                  src={imageUrl} 
+                  alt={displayName} 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
               ) : (
-                <Skeleton style={{ height: 220 }} />
+                <Skeleton className="w-full h-full" />
               )}
             </div>
-
-            <div style={{ padding: 12 }}>
-              <div style={{ fontWeight: 600 }}>{displayName}</div>
-              <div style={{ color: "#666", marginTop: 6 }}>{formatPrice(price)}</div>
-            </div>
-
           </a>
 
-          <CardFooter style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 12 }}>
-            <Badge>{source || "Unknown"}</Badge>
+          {/* Text Section - Clickable */}
+          <a 
+            href={productUrl || "#"} 
+            target="_blank" 
+            rel="noreferrer"
+            className="flex-grow flex flex-col p-3 hover:no-underline"
+            onClick={(e) => {
+              if (!productUrl) {
+                e.preventDefault();
+              }
+            }}
+          >
+            <div className="font-semibold text-gray-900 text-sm line-clamp-2 hover:text-gray-700">{displayName}</div>
+            <div className="text-lg font-bold text-black mt-2">{formatPrice(price)}</div>
+          </a>
 
-            <DialogTrigger asChild>
-              <Button aria-label="AI Style Builder" title="Build outfit suggestions">
-                <Wand2 />
+          {/* Footer with Actions */}
+          <CardFooter className="flex justify-between items-center gap-2 p-3 border-t">
+            <Badge variant="secondary" className="text-xs">{source || "Unknown"}</Badge>
+
+            <div className="flex gap-2">
+              {productUrl && (
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="h-8 w-8 p-0 hover:bg-gray-200"
+                  title="View on retailer"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    window.open(productUrl, '_blank');
+                  }}
+                >
+                  <ExternalLink className="w-4 h-4 text-black" />
+                </Button>
+              )}
+              
+              <DialogTrigger asChild>
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="h-8 w-8 p-0 hover:bg-gray-200"
+                  title="AI Style Builder"
+                >
+                  <Wand2 className="w-4 h-4 text-black" />
+                </Button>
+              </DialogTrigger>
+
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                className="h-8 w-8 p-0 hover:bg-red-100"
+                title={isInWishlist ? "Remove from wishlist" : "Add to wishlist"}
+                onClick={handleWishlistClick}
+              >
+                <Heart 
+                  className={`w-4 h-4 ${isInWishlist ? 'fill-red-500 text-red-500' : 'text-gray-400'}`} 
+                />
               </Button>
-            </DialogTrigger>
+            </div>
           </CardFooter>
         </Card>
       </div>

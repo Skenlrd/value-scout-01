@@ -6,6 +6,7 @@ import Compare from "./pages/Compare";
 import StyleBuilderSearchPage from "./pages/StyleBuilderSearchPage"; // ✅ Correct path
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import Wishlist from "./pages/Wishlist";
 
 import Navbar from "./components/Navbar";
 import BrandLogo from "./components/BrandLogo";
@@ -23,7 +24,7 @@ function App() {
   return (
     <Router>
       {/* Brand logo + Navbar */}
-      <header className="text-center py-6">
+      <header className="text-center py-6 bg-gradient-to-br from-[#eaf6f2] to-[#b6c9c3]">
         <BrandLogo size="md" />
       </header>
 
@@ -35,12 +36,14 @@ function App() {
           {/* Public routes */}
           <Route path="/" element={<Home />} />
           <Route path="/compare" element={<Compare />} />
+          <Route path="/wishlist" element={<Wishlist />} />
 
           {/* ✅ AI Style Builder Route */}
           <Route path="/style-builder" element={<StyleBuilderSearchPage />} />
 
           {/* Auth */}
           <Route path="/login" element={<Auth onLogin={handleLogin} />} />
+          <Route path="/register" element={<Auth onLogin={handleLogin} initialMode="signup" />} />
           <Route path="/signup" element={<Auth onLogin={handleLogin} initialMode="signup" />} />
 
           {/* 404 */}

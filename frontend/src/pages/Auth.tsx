@@ -27,21 +27,16 @@ const Auth = ({ onLogin, initialMode = 'login' }: AuthProps) => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4">
-      <div className="text-center mb-8">
-        <BrandLogo size="lg" />
-      </div>
-
+    <div className="min-h-screen flex flex-col items-center justify-start pt-24 p-4 bg-gradient-to-br from-[#eaf6f2] to-[#b6c9c3]">
       <div
-        className="w-full max-w-md glass-effect rounded-2xl shadow-2xl p-8 transition-smooth"
-        // Adjust minHeight to fit content responsively
-        style={{ minHeight: isSignup ? "560px" : "480px" }} 
+        className="w-full max-w-md backdrop-blur-xl bg-white/30 border border-white/40 rounded-3xl shadow-2xl p-8 transition-smooth"
+        style={{ minHeight: isSignup ? "580px" : "500px" }} 
       >
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold mb-2">
+        <div className="text-center mb-6">
+          <h2 className="text-3xl font-bold mb-2 text-gray-900">
             {isSignup ? "Create Account" : "Welcome Back!"}
           </h2>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-gray-600 text-sm">
             {isSignup
               ? "Join ValueScout and shop smarter today."
               : "Sign in to continue your style journey."}
@@ -49,14 +44,14 @@ const Auth = ({ onLogin, initialMode = 'login' }: AuthProps) => {
         </div>
 
         {/* Use the new handleSubmit */}
-        <form className="space-y-6" onSubmit={handleSubmit}>
+        <form className="space-y-5" onSubmit={handleSubmit}>
           <div className="relative">
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
             <Input
               type="email"
               placeholder="Email"
               required
-              className="pl-10 bg-white/60 border-transparent focus:ring-2 focus:ring-primary rounded-lg"
+              className="pl-12 bg-white/40 border border-white/30 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-teal-400 focus:border-transparent rounded-xl"
             />
           </div>
 
@@ -64,42 +59,42 @@ const Auth = ({ onLogin, initialMode = 'login' }: AuthProps) => {
 
           {isSignup && <PasswordInput placeholder="Confirm Password" required />}
 
-          <Button type="submit" className="w-full bg-primary hover:bg-primary/90 h-12 rounded-lg">
+          <Button type="submit" className="w-full bg-teal-600 hover:bg-teal-700 text-white h-12 rounded-xl font-semibold text-lg">
             {isSignup ? "Create Account" : "Login"}
           </Button>
         </form>
 
         <div className="text-center mt-6">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-gray-700">
             {isSignup ? "Already have an account?" : "Don't have an account?"}{" "}
             <button
-              type="button" // Use type="button" to prevent form submission when clicking
+              type="button"
               onClick={() => setIsSignup(!isSignup)}
-              className="font-bold text-foreground hover:text-brand-scout transition-colors"
+              className="font-bold text-teal-600 hover:text-teal-700 transition-colors"
             >
               {isSignup ? "Login" : "Sign Up"}
             </button>
           </p>
         </div>
 
-        <div className="mt-8 flex items-center justify-between">
-          <span className="border-b w-1/5 lg:w-1/4 border-border"></span>
-          <p className="text-xs text-center text-muted-foreground uppercase">Or sign in with</p>
-          <span className="border-b w-1/5 lg:w-1/4 border-border"></span>
+        <div className="mt-6 flex items-center justify-between">
+          <span className="border-b w-1/5 lg:w-1/4 border-white/40"></span>
+          <p className="text-xs text-center text-gray-600 uppercase tracking-wider">Or sign in with</p>
+          <span className="border-b w-1/5 lg:w-1/4 border-white/40"></span>
         </div>
 
         <div className="mt-6 flex justify-center gap-4">
-          <button type="button" className="w-12 h-12 bg-white/50 rounded-full flex items-center justify-center hover:bg-white/80 transition-smooth p-2.5">
+          <button type="button" className="w-12 h-12 bg-white/50 hover:bg-white/70 rounded-full flex items-center justify-center transition-all backdrop-blur-sm border border-white/40">
             <img
               src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg"
               alt="Google"
-              className="w-full h-full"
+              className="w-6 h-6"
             />
           </button>
-          <button type="button" className="w-12 h-12 bg-white/50 rounded-full flex items-center justify-center hover:bg-white/80 transition-smooth">
-            {/* Apple Logo SVG - I replaced the generic SVG with a proper Apple logo path for clarity */}
-            <svg viewBox="0 0 1000 1000" role="img" fill="currentColor" className="w-6 h-6">
-                <path d="M789.7 542.4c-12.2-22.1-33.1-41-47.8-63.5-12.7-19.5-27.1-40.4-30-63.7-2.6-20.1 7.2-40.6 20.8-55.6 15.6-18.4 35.8-31.4 38.3-55.5-2.2-13.8-13.6-29.3-26.6-40.7-11.8-10.4-25.1-18.3-39-25.7-17.6-9.1-35.3-17.1-57.8-16.1-28.7 1.4-53 18.2-70.3 35.5-14.8 14.8-29.4 30.2-47.5 40.5-22.4 12.8-48.4 11.2-70.8 2.6-17.9-6.9-34.9-19.1-49.8-31.9-18.1-15.6-35.1-32.9-60.1-35.4-23.8-2.3-46.7 8.3-64.8 25.4-17.7 16.4-32.5 35.8-43.2 57.3-13.7 27.2-21.7 56.5-18.1 87.5 4.5 39.1 27.6 74.3 49.3 103.8 21.6 29.3 43.1 58.7 66.8 85.5 17 19.3 36.6 37.5 59.9 51.5 28 17.1 57.2 27.3 90.7 28.5 29.7 1 59.1-8.2 84.7-23.7 11.4-6.9 22.3-14.9 31.8-25.4 16.3-18 29.8-38.3 40.9-60.6 10.1-19.9 21.6-40.8 33.6-61.9 14.7-25.6 31.1-50.6 35.7-77.7zm-265.4-448c26.7 1.9 50.4 18.2 60 41.7 8.8 21-1.6 42.8-18.6 57.3-17.1 14.4-37.4 21.7-60.1 18-20.7-3.4-39.6-18.1-47.2-39.7-7.8-22.3 2.9-46 22.1-60.7 15.6-11.9 35-18.4 43.8-16.6z"/>
+          <button type="button" className="w-12 h-12 bg-white/50 hover:bg-white/70 rounded-full flex items-center justify-center transition-all backdrop-blur-sm border border-white/40">
+            {/* Apple Logo SVG */}
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 text-gray-900">
+              <path d="M17.05 13.5c-.91 0-1.82.55-2.25 1.51.93.64 1.5 1.62 1.5 2.74 0 1.68-1.25 3.09-2.88 3.09-1.11 0-2.05-.67-2.35-1.64H9.04c.3.97 1.24 1.64 2.35 1.64 1.63 0 2.88-1.41 2.88-3.09 0-1.12-.57-2.1-1.5-2.74.43-.96 1.34-1.51 2.25-1.51 1.66 0 3 1.34 3 3 0 1.66-1.34 3-3 3zm-8.05-2.5c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm0-5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1zm8.05 2.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"/>
             </svg>
           </button>
         </div>

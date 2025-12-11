@@ -44,16 +44,17 @@ const StyleBuilderPage: React.FC = () => {
   };
 
   return (
-    <div className="px-6 sm:px-10 md:px-16 lg:px-24 py-10">
-      <div className="max-w-7xl mx-auto text-center">
-        <h1 className="text-3xl md:text-4xl font-semibold text-gray-800 mb-3">
-          AI Style Builder
-        </h1>
+    <div className="min-h-screen bg-gradient-to-br from-[#eaf6f2] to-[#b6c9c3]">
+      <div className="px-6 sm:px-10 md:px-16 lg:px-24 py-10">
+        <div className="max-w-7xl mx-auto text-center">
+          <h1 className="text-3xl md:text-4xl font-semibold text-gray-800 mb-3">
+            AI Style Builder
+          </h1>
 
-        <p className="text-gray-700 mb-8 text-sm md:text-base">
-          Search clothing and footwear, then tap the AI icon on any product to
-          generate matching outfit ideas.
-        </p>
+          <p className="text-gray-700 mb-8 text-sm md:text-base">
+            Search clothing and footwear, then tap the AI icon on any product to
+            generate matching outfit ideas.
+          </p>
 
         <div className="max-w-2xl mx-auto mb-10">
           <SearchBar onSearch={handleSearch} />
@@ -93,6 +94,7 @@ const StyleBuilderPage: React.FC = () => {
             </div>
           )
         )}
+        </div>
       </div>
     </div>
   );

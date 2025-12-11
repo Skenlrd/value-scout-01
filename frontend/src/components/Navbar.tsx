@@ -1,13 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 // Import the 'Sparkles' icon
-import { Menu, User, Sparkles, Star } from "lucide-react";
+import { Menu, User, Sparkles, Star, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import useAuth from "@/hooks/useAuth";
 
 type NavbarProps = {
   onLogout?: () => void;
@@ -18,6 +19,62 @@ const Navbar = ({ onLogout }: NavbarProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const navigate = useNavigate();
+  const authHook = useAuth();
+  const [user, setUser] = useState(authHook.user);
+  const [isAuthenticated, setIsAuthenticated] = useState(authHook.isAuthenticated);
+
+  // Listen for storage changes (e.g., when Google OAuth stores user in localStorage)
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const storedUser = localStorage.getItem("valuescout_user");
+      if (storedUser) {
+        try {
+          const userData = JSON.parse(storedUser);
+          setUser(userData);
+          setIsAuthenticated(true);
+        } catch (e) {
+          console.error("Failed to parse stored user:", e);
+        }
+      } else {
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+    };
+
+    // Listen to storage changes from other tabs/windows
+    window.addEventListener("storage", handleStorageChange);
+    
+    // Also listen for a custom event when localStorage changes in same tab
+    window.addEventListener("valueScoutAuthChange", handleStorageChange);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("valueScoutAuthChange", handleStorageChange);
+    };
+  }, []);
+
+  // Also sync when authHook updates
+  useEffect(() => {
+    setUser(authHook.user);
+    setIsAuthenticated(authHook.isAuthenticated);
+  }, [authHook.user, authHook.isAuthenticated]);
+
+  const logout = () => {
+    authHook.logout();
+    setUser(null);
+    setIsAuthenticated(false);
+  };
+
+  const handleLogout = () => {
+    authHook.logout();
+    setUser(null);
+    setIsAuthenticated(false);
+    setIsProfileOpen(false);
+    if (onLogout) {
+      onLogout();
+    }
+    navigate("/");
+  };
 
   const navLinks = [
     { label: "COMPARE DEALS", href: "/compare" },
@@ -132,28 +189,44 @@ const Navbar = ({ onLogout }: NavbarProps) => {
 
               {/* Dropdown Menu */}
               {isProfileOpen && (
-                <div className="absolute right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                  <div className="flex px-2 py-2">
-                    <button
-                      onClick={() => {
-                        navigate("/login");
-                        setIsProfileOpen(false);
-                      }}
-                      className="flex-1 text-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-brand-scout transition-colors"
-                    >
-                      Login
-                    </button>
-                    <span className="text-gray-300">/</span>
-                    <button
-                      onClick={() => {
-                        navigate("/register");
-                        setIsProfileOpen(false);
-                      }}
-                      className="flex-1 text-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-brand-scout transition-colors"
-                    >
-                      Register
-                    </button>
-                  </div>
+                <div className="absolute right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[200px]">
+                  {isAuthenticated ? (
+                    <div className="py-2">
+                      <div className="px-4 py-2 border-b border-gray-200">
+                        <p className="text-sm font-semibold text-gray-900">{user?.name || 'User'}</p>
+                        <p className="text-xs text-gray-600">{user?.email}</p>
+                      </div>
+                      <button
+                        onClick={handleLogout}
+                        className="w-full text-left px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Logout
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex px-2 py-2">
+                      <button
+                        onClick={() => {
+                          navigate("/login");
+                          setIsProfileOpen(false);
+                        }}
+                        className="flex-1 text-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-brand-scout transition-colors"
+                      >
+                        Login
+                      </button>
+                      <span className="text-gray-300">/</span>
+                      <button
+                        onClick={() => {
+                          navigate("/register");
+                          setIsProfileOpen(false);
+                        }}
+                        className="flex-1 text-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-brand-scout transition-colors"
+                      >
+                        Register
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

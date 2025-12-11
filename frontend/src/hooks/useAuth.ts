@@ -1,30 +1,101 @@
-// This mock hook simulates a successfully logged-in user session
-// and ensures a non-null user object is always returned, bypassing any
-// database dependency and fixing the "null (reading 'user_id')" error.
+import { useState, useEffect, createContext, useContext } from 'react';
 
 interface User {
-  user_id: string;
+  id: string;
   email: string;
-  isLoggedIn: boolean;
+  name: string;
 }
 
-const mockUser: User = {
-  // CRITICAL FIX: This property prevents the crash in Home.tsx.
-  user_id: "SIMULATED_USER_12345", 
-  email: "mock_user@valuescout.com",
-  isLoggedIn: true,
+interface AuthContextType {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, name?: string) => Promise<void>;
+  logout: () => void;
+}
+
+// Get user from localStorage
+const getUserFromStorage = (): User | null => {
+  const userStr = localStorage.getItem('valuescout_user');
+  if (userStr) {
+    try {
+      return JSON.parse(userStr);
+    } catch {
+      return null;
+    }
+  }
+  return null;
 };
 
 const useAuth = () => {
-  // In a real application, this would manage state and context.
-  // For now, we return a mock user instantly.
+  const [user, setUser] = useState<User | null>(getUserFromStorage());
+  const [isLoading, setIsLoading] = useState(false);
+
+  const login = async (email: string, password: string) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('http://localhost:8000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Login failed');
+      }
+
+      const userData = data.user;
+      setUser(userData);
+      localStorage.setItem('valuescout_user', JSON.stringify(userData));
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const register = async (email: string, password: string, name?: string) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('http://localhost:8000/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, name })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Registration failed');
+      }
+
+      const userData = data.user;
+      setUser(userData);
+      localStorage.setItem('valuescout_user', JSON.stringify(userData));
+    } catch (error) {
+      console.error('Registration error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem('valuescout_user');
+  };
+
   return {
-    user: mockUser,
-    isAuthenticated: true,
-    isLoading: false,
-    // Placeholder functions to satisfy any component that calls them
-    login: () => console.log("Mock login executed"),
-    logout: () => console.log("Mock logout executed"),
+    user,
+    isAuthenticated: !!user,
+    isLoading,
+    login,
+    register,
+    logout
   };
 };
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Wand2, Heart, ExternalLink } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Wand2, Heart, ExternalLink, Star } from "lucide-react";
 
 import { Dialog, DialogTrigger, DialogContent } from "./ui/dialog";
 import { Badge } from "./ui/badge";
@@ -35,6 +36,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
   
   const displayName = productName ?? name ?? "";
   const [open, setOpen] = useState(false);
+  const [showWishlistConfirm, setShowWishlistConfirm] = useState(false);
+  const [isAddingToWishlist, setIsAddingToWishlist] = useState(false);
 
   const handleWishlistClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -51,9 +54,55 @@ const ProductCard: React.FC<ProductCardProps> = ({
     }
   };
 
+  // Add to wishlist handler for the Star button
+  const handleAddToWishlist = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    try {
+      const user = JSON.parse(localStorage.getItem('valuescout_user') || '{}');
+      if (!user.id) {
+        alert('Please login to add to wishlist');
+        return;
+      }
+
+      setIsAddingToWishlist(true);
+      const response = await fetch('http://localhost:8000/api/wishlist/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          title: displayName,
+          price: price,
+          source: source || 'Unknown',
+          link: productUrl,
+          image: imageUrl,
+        })
+      });
+
+      if (response.ok) {
+        setShowWishlistConfirm(true);
+        setTimeout(() => setShowWishlistConfirm(false), 2500);
+      } else {
+        alert('Failed to add to wishlist');
+      }
+    } catch (err) {
+      console.error('Failed to add to wishlist:', err);
+      alert('Error adding to wishlist');
+    } finally {
+      setIsAddingToWishlist(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <div className="group cursor-pointer h-full">
+      <div className="group cursor-pointer h-full relative">
+        {/* Wishlist Added Confirmation */}
+        {showWishlistConfirm && (
+          <div className="absolute top-2 right-2 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-semibold z-50 animate-pulse">
+            ✓ Added to Wishlist
+          </div>
+        )}
         <Card className="flex flex-col h-full overflow-hidden hover:shadow-lg transition-shadow">
           {/* Image Section - Clickable */}
           <a 
@@ -118,6 +167,18 @@ const ProductCard: React.FC<ProductCardProps> = ({
                   <ExternalLink className="w-4 h-4 text-black" />
                 </Button>
               )}
+
+            {/* Wishlist Button - Add to Wishlist */}
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                className={`h-8 w-8 p-0 ${showWishlistConfirm ? 'hover:bg-green-100' : 'hover:bg-amber-100'}`}
+                title="Add to wishlist"
+                onClick={handleAddToWishlist}
+                disabled={isAddingToWishlist}
+              >
+                <Star className={`w-4 h-4 ${showWishlistConfirm ? 'text-green-600 fill-green-600' : 'text-amber-500'}`} />
+              </Button>
               
               <DialogTrigger asChild>
                 <Button 
@@ -170,6 +231,8 @@ const AIStyleBuilderModalContent: React.FC<AIStyleBuilderModalContentProps> = ({
   const [baseCategory, setBaseCategory] = useState<string>("");
   const [activeTab, setActiveTab] = useState<string>("all");
   const [error, setError] = useState<string | null>(null);
+  const [wishlistItems, setWishlistItems] = useState<Set<string>>(new Set());
+  const [showWishlistConfirm, setShowWishlistConfirm] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -242,6 +305,20 @@ const AIStyleBuilderModalContent: React.FC<AIStyleBuilderModalContentProps> = ({
 
   return (
     <div style={{ padding: 8 }}>
+      {showWishlistConfirm && (
+        <div style={{ 
+          backgroundColor: "#d1fae5", 
+          border: "1px solid #10b981", 
+          borderRadius: "8px", 
+          padding: "12px", 
+          marginBottom: "16px", 
+          color: "#047857", 
+          fontSize: "14px",
+          fontWeight: "500"
+        }}>
+          ✅ {showWishlistConfirm} added to wishlist! You'll get email alerts when the price drops.
+        </div>
+      )}
       <h3 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>AI Style Suggestions</h3>
       {baseCategory && (
         <div style={{ marginBottom: 12, fontSize: 13, color: "#555" }}>
@@ -275,11 +352,42 @@ const AIStyleBuilderModalContent: React.FC<AIStyleBuilderModalContentProps> = ({
           const tabs = ["all", ...presentCats];
           if (!tabs.includes(activeTab)) setActiveTab("all");
 
+          const addToWishlist = async (product: any) => {
+            try {
+              const user = JSON.parse(localStorage.getItem('valuescout_user') || '{}');
+              if (!user.id) {
+                alert('Please login to add to wishlist');
+                return;
+              }
+
+              const response = await fetch('http://localhost:8000/api/wishlist/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId: user.id,
+                  title: product.productName || product.name,
+                  price: product.price,
+                  source: product.source || 'Unknown',
+                  link: product.productUrl,
+                  image: product.imageUrl,
+                })
+              });
+
+              if (response.ok) {
+                setWishlistItems(prev => new Set([...prev, product._id]));
+                setShowWishlistConfirm(product.productName || product.name);
+                setTimeout(() => setShowWishlistConfirm(null), 3000);
+              }
+            } catch (err) {
+              console.error('Failed to add to wishlist:', err);
+            }
+          };
+
           const renderItems = (items: any[]) => (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
               {items.map((p) => (
-                <div key={p._id} style={{ border: "1px solid #eee", padding: 12, borderRadius: 8 }}>
-                  <a href={p.productUrl} target="_blank" rel="noreferrer" style={{ textDecoration: "none", color: "inherit" }}>
+                <div key={p._id} style={{ border: "1px solid #eee", padding: 12, borderRadius: 8, display: "flex", flexDirection: "column" }}>
+                  <a href={p.productUrl} target="_blank" rel="noreferrer" style={{ textDecoration: "none", color: "inherit", flex: 1 }}>
                     <div style={{ width: "100%", height: 200, background: "#fafafa", display: "flex", alignItems: "center", justifyContent: "center" }}>
                       {p.imageUrl ? (
                         <img src={p.imageUrl} alt={p.productName || p.name} style={{ maxWidth: "100%", maxHeight: "100%" }} />
@@ -290,6 +398,14 @@ const AIStyleBuilderModalContent: React.FC<AIStyleBuilderModalContentProps> = ({
                     <div style={{ marginTop: 10, fontWeight: 600 }}>{p.productName || p.name}</div>
                     <div style={{ marginTop: 6, color: "#666" }}>{formatPrice(p.price)}</div>
                   </a>
+                  <Button
+                    size="sm"
+                    onClick={() => addToWishlist(p)}
+                    style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 6, width: "100%", backgroundColor: wishlistItems.has(p._id) ? "#10b981" : "#d1d5db", color: "white", border: "none", padding: "8px", borderRadius: "4px", cursor: "pointer", fontSize: "12px", fontWeight: "500" }}
+                  >
+                    <Heart className="w-4 h-4" fill={wishlistItems.has(p._id) ? "white" : "none"} />
+                    {wishlistItems.has(p._id) ? "Added to Wishlist" : "Add to Wishlist"}
+                  </Button>
                 </div>
               ))}
             </div>

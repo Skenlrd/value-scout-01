@@ -3,6 +3,8 @@ import SearchBar from "../components/SearchBar";
 import ProductCard from "../components/ProductCard";
 import DealCard from "../components/DealCard";
 import WishlistCard from "../components/WishlistCard";
+import AuthRequiredDialog from "../components/AuthRequiredDialog";
+import useAuth from "../hooks/useAuth";
 // Import the video file
 import heroVideo from "../assets/video1.mp4";
 
@@ -43,7 +45,10 @@ const Home = () => {
   const [trendingLoading, setTrendingLoading] = useState(true);
   const [lowestLoading, setLowestLoading] = useState(true);
   const [wishlistLoading, setWishlistLoading] = useState(true);
-  const userId = "guest"; // Placeholder user ID
+  const [showAuthDialog, setShowAuthDialog] = useState(false);
+  
+  const { user, isAuthenticated } = useAuth();
+  const userId = user?.id || null;
 
   // Brand names to filter (high-end fashion & shoes)
   const brandNames = [
@@ -70,11 +75,11 @@ const Home = () => {
   };
 
   const filterResults = (results: SearchResult[]): SearchResult[] => {
+    // Temporarily less restrictive filter - just check if it has a price/link
     return results.filter(product => {
-      const productName = getProductName(product);
-      const hasValidBrand = isBrandName(productName);
-      const isFashion = isFashionOrShoes(productName);
-      return hasValidBrand && isFashion;
+      const hasLink = product.link && product.link.length > 0;
+      const hasPrice = product.price !== undefined && product.price !== null;
+      return hasLink; // Just need a link
     });
   };
 
@@ -190,6 +195,9 @@ const Home = () => {
   };
 
   const removeFromWishlist = async (product: SearchResult) => {
+    if (!isAuthenticated || !userId) {
+      return;
+    }
     try {
       const response = await fetch("http://localhost:8000/api/wishlist/remove", {
         method: "DELETE",
@@ -231,22 +239,28 @@ const Home = () => {
       }
 
       const data = await response.json();
+      console.log("Search response:", data);
 
       if (data.all && Array.isArray(data.all)) {
         // Filter to show only brand-name fashion/shoes
         const filteredResults = filterResults(data.all);
+        console.log("Filtered results:", filteredResults);
         
         if (filteredResults.length > 0) {
           setSearchResults(filteredResults);
           setShowResults(true);
         } else {
+          setError("No results found matching your criteria");
           setShowResults(false);
         }
       } else {
+        console.warn("No 'all' array in response:", data);
+        setError("No results found");
         setShowResults(false);
       }
     } catch (err) {
       console.error("Search error:", err);
+      setError(`Error: ${err instanceof Error ? err.message : "Unknown error"}`);
       setShowResults(false);
     } finally {
       setSearchLoading(false);
@@ -254,6 +268,12 @@ const Home = () => {
   };
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#eaf6f2] to-[#b6c9c3]">
+      {/* Auth Required Dialog */}
+      <AuthRequiredDialog 
+        open={showAuthDialog}
+        onOpenChange={setShowAuthDialog}
+        feature="wishlist and price tracking"
+      />
 
       {/* Hero Section with Search */}
       <section className="relative h-[60vh] max-h-[500px] overflow-hidden">
@@ -278,6 +298,13 @@ const Home = () => {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-16">
+        {/* Error Display */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-700">{error}</p>
+          </div>
+        )}
+
         {/* Search Results Section - Shows Right Below Hero */}
         {searchLoading && (
           <div className="text-center mb-12 animate-pulse">

@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { Heart, ExternalLink, Trash2, TrendingDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useNavigate } from "react-router-dom";
+import useAuth from "@/hooks/useAuth";
+import AuthRequiredDialog from "@/components/AuthRequiredDialog";
 
 interface WishlistItem {
   _id?: string;
@@ -19,15 +22,27 @@ const Wishlist = () => {
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const userId = "guest";
   const [priceAlerts, setPriceAlerts] = useState<{ [key: string]: number }>({});
   const [priceInputs, setPriceInputs] = useState<{ [key: string]: string }>({});
+  const [showAuthDialog, setShowAuthDialog] = useState(false);
+  const [priceAlertConfirm, setPriceAlertConfirm] = useState<{ title: string; price: number } | null>(null);
+  
+  const { user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const userId = user?.id || null;
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setShowAuthDialog(true);
+      setLoading(false);
+      return;
+    }
     fetchWishlist();
-  }, []);
+  }, [isAuthenticated]);
 
   const fetchWishlist = async () => {
+    if (!userId) return;
+    
     setLoading(true);
     try {
       const response = await fetch(`http://localhost:8000/api/wishlist/${userId}`);
@@ -68,6 +83,11 @@ const Wishlist = () => {
   };
 
   const handlePriceAlert = async (itemId: string, targetPrice: number) => {
+    if (!isAuthenticated || !userId) {
+      setShowAuthDialog(true);
+      return;
+    }
+    
     if (!targetPrice || targetPrice <= 0) {
       console.warn("Invalid target price");
       return;
@@ -91,6 +111,16 @@ const Wishlist = () => {
           ...priceAlerts,
           [itemId]: targetPrice,
         });
+        
+        // Show confirmation message
+        const item = wishlistItems.find(i => i._id === itemId);
+        setPriceAlertConfirm({ 
+          title: item?.title || 'Product', 
+          price: targetPrice 
+        });
+        
+        // Auto-dismiss after 4 seconds
+        setTimeout(() => setPriceAlertConfirm(null), 4000);
       } else {
         console.error("Failed to set price alert");
       }
@@ -102,6 +132,16 @@ const Wishlist = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#eaf6f2] to-[#b6c9c3]">
+        <AuthRequiredDialog 
+          open={showAuthDialog}
+          onOpenChange={(open) => {
+            setShowAuthDialog(open);
+            if (!open && !isAuthenticated) {
+              navigate("/");
+            }
+          }}
+          feature="wishlist and price tracking"
+        />
         <div className="container mx-auto px-4 py-16">
           <div className="text-center">
             <div className="inline-flex items-center gap-3">
@@ -114,9 +154,47 @@ const Wishlist = () => {
     );
   }
 
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#eaf6f2] to-[#b6c9c3]">
+        <AuthRequiredDialog 
+          open={showAuthDialog}
+          onOpenChange={(open) => {
+            setShowAuthDialog(open);
+            if (!open) {
+              navigate("/");
+            }
+          }}
+          feature="wishlist and price tracking"
+        />
+        <div className="container mx-auto px-4 py-16 text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">Login Required</h1>
+          <p className="text-gray-700 mb-6">Please login to view your wishlist</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#eaf6f2] to-[#b6c9c3]">
       <div className="container mx-auto px-4 py-16">
+        {/* Price Alert Confirmation */}
+        {priceAlertConfirm && (
+          <div className="mb-6 max-w-2xl mx-auto bg-green-50 border border-green-200 rounded-lg shadow-md p-4">
+            <div className="flex items-start gap-3">
+              <div className="text-2xl">📧</div>
+              <div>
+                <h4 className="font-bold text-green-900">Price Tracked Successfully!</h4>
+                <p className="text-green-800 text-sm mt-1">
+                  <strong>{priceAlertConfirm.title}</strong> is now being tracked.
+                </p>
+                <p className="text-green-700 text-sm">
+                  We'll send you an email notification when the price drops below ₹{priceAlertConfirm.price.toLocaleString('en-IN')}.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Header */}
         <div className="mb-12 text-center">
           <h1 className="text-5xl font-bold text-gray-900 mb-4">

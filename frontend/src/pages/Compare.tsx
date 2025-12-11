@@ -1,176 +1,291 @@
-import ComparisonProductCard from "@/components/ComparisonProductCard";
+import { useState, useEffect } from "react";
+import { Search, AlertCircle } from "lucide-react";
+
+interface ComparisonSource {
+  source: string;
+  title: string | null;
+  price: string | number | null;
+  image: string | null;
+  link: string | null;
+  rating: number | null;
+  reviews: number | null;
+}
+
+interface ComparisonResult {
+  query: string;
+  sources: {
+    local: ComparisonSource | null;
+    amazon: ComparisonSource | null;
+    flipkart: ComparisonSource | null;
+  };
+  timestamp: string;
+}
 
 const Compare = () => {
-  // Mock comparison data - for comparing specific products
-  const comparisonResults = [
-    {
-      storeName: "Amazon Prime",
-      price: "₹10,795",
-      rating: 4.5,
-      deliveryDate: "12 Jul",
-    },
-    {
-      storeName: "Myntra",
-      price: "₹8,995",
-      rating: 4.8,
-      deliveryDate: "9 Jul",
-      isHighlighted: true,
-    },
-    {
-      storeName: "Flipkart",
-      price: "₹9,499",
-      rating: 4.3,
-      deliveryDate: "10 Jul",
-    },
-  ];
+  const [searchQuery, setSearchQuery] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [comparisonData, setComparisonData] = useState<ComparisonResult | null>(null);
+
+  const handleSearch = async () => {
+    const query = searchQuery.trim();
+    if (!query) {
+      setError("Please enter a product name");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setComparisonData(null);
+
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/compare-prices?q=${encodeURIComponent(query)}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch comparison data");
+      }
+
+      const data = await response.json();
+      setComparisonData(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error fetching comparison data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Determine which source has the lowest price
+  const getLowestPriceSource = () => {
+    if (!comparisonData) return null;
+
+    const sources = [
+      comparisonData.sources.local,
+      comparisonData.sources.amazon,
+      comparisonData.sources.flipkart
+    ].filter(s => s && s.price);
+
+    if (sources.length === 0) return null;
+
+    return sources.reduce((lowest, current) => {
+      const lowestPrice = typeof lowest.price === "string" 
+        ? parseFloat(lowest.price.replace(/[^\d.]/g, ""))
+        : lowest.price;
+      const currentPrice = typeof current.price === "string"
+        ? parseFloat(current.price.replace(/[^\d.]/g, ""))
+        : current.price;
+
+      return currentPrice < lowestPrice ? current : lowest;
+    });
+  };
+
+  const lowestPriceSource = getLowestPriceSource();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-[#eaf6f2] to-[#b6c9c3]">
       {/* Header */}
-      <div className="border-b border-slate-700 bg-slate-950/50">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <h1 className="text-3xl font-bold text-white">Compare Prices</h1>
-          <p className="text-slate-400 mt-2">Find the best deal across different stores</p>
-        </div>
+      <div className="text-center py-8">
+        <h1 className="text-4xl font-bold text-gray-900 mb-2">Price Comparison</h1>
       </div>
 
-      {/* Product comparison section */}
-      <div className="max-w-7xl mx-auto px-4 py-12">
-        {/* Product header */}
-        <div className="mb-12">
-          <div className="flex items-center gap-6">
-            <div className="flex-1">
-              <h2 className="text-2xl font-bold text-white mb-2">Nike Air Max 90</h2>
-              <p className="text-slate-400">Men's Running Shoes • Size 10</p>
-              <div className="flex items-center gap-4 mt-4">
-                <span className="text-3xl font-bold text-green-400">₹8,995</span>
-                <span className="text-sm bg-green-500/20 text-green-300 px-3 py-1 rounded">
-                  Best Price
-                </span>
+      {/* Search Section - Large Centered Bar like AI Style Builder */}
+      <div className="flex flex-col items-center justify-center px-4 py-8">
+        <div className="w-full max-w-2xl">
+          <div className="relative mb-8">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-600 h-5 w-5" />
+            <input
+              type="text"
+              placeholder="Search for deals, prices, and more..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+              className="w-full pl-12 pr-6 py-3 bg-white/80 text-gray-900 placeholder-gray-600 rounded-full focus:outline-none focus:ring-2 focus:ring-teal-400 focus:bg-white"
+            />
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-8 flex items-center gap-2">
+              <AlertCircle className="h-5 w-5" />
+              {error}
+            </div>
+          )}
+
+          {/* Loading State */}
+          {loading && (
+            <div className="text-center py-12">
+              <div className="inline-flex items-center gap-3">
+                <div className="w-6 h-6 rounded-full border-2 border-teal-600 border-t-transparent animate-spin"></div>
+                <span className="text-gray-700">Comparing prices...</span>
               </div>
             </div>
-            <div className="aspect-square w-40 bg-slate-700 rounded-lg overflow-hidden flex-shrink-0">
-              <img
-                src="https://via.placeholder.com/200"
-                alt="Nike Air Max 90"
-                className="w-full h-full object-cover"
-              />
+          )}
+
+          {/* Comparison Results */}
+          {comparisonData && !loading && (
+            <div className="mt-12">
+              {/* Product Header */}
+              <div className="mb-12 p-6 bg-white/40 rounded-lg border border-white/30">
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">{comparisonData.query}</h2>
+                <p className="text-gray-700">Best prices from Local DB, Amazon, and Flipkart</p>
+              </div>
+
+              {/* Comparison Cards Grid - 3 columns */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                {[
+                  { key: "local", label: "Local DB", data: comparisonData.sources.local },
+                  { key: "amazon", label: "Amazon", data: comparisonData.sources.amazon },
+                  { key: "flipkart", label: "Flipkart", data: comparisonData.sources.flipkart }
+                ].map(({ key, label, data }) => {
+                  const isLowestPrice = data && lowestPriceSource && data.source === lowestPriceSource.source;
+                  
+                  return (
+                    <div
+                      key={key}
+                      className={`rounded-lg overflow-hidden border-2 transition-all bg-white/60 backdrop-blur-sm ${
+                        isLowestPrice
+                          ? "border-green-500 shadow-lg"
+                          : "border-white/30"
+                      }`}
+                    >
+                      {/* Store Header */}
+                      <div className={`px-6 py-4 ${isLowestPrice ? "bg-green-100" : "bg-white/40"}`}>
+                        <h3 className="text-lg font-bold text-gray-900 flex items-center justify-between">
+                          {label}
+                          {isLowestPrice && (
+                            <span className="text-xs bg-green-600 text-white px-3 py-1 rounded-full font-semibold">
+                              Best Price
+                            </span>
+                          )}
+                        </h3>
+                      </div>
+
+                      {/* Card Content */}
+                      <div className="p-6">
+                        {data ? (
+                          <>
+                            {/* Image */}
+                            {data.image && (
+                              <div className="mb-4 h-48 bg-gray-200 rounded-lg overflow-hidden flex items-center justify-center">
+                                <img
+                                  src={data.image}
+                                  alt={data.title || "Product"}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    e.currentTarget.src = "https://via.placeholder.com/200?text=No+Image";
+                                  }}
+                                />
+                              </div>
+                            )}
+
+                            {/* Title */}
+                            <h4 className="text-gray-900 font-semibold mb-3 line-clamp-2 text-sm">
+                              {data.title}
+                            </h4>
+
+                            {/* Price */}
+                            <div className={`text-3xl font-bold mb-4 ${isLowestPrice ? "text-green-600" : "text-gray-900"}`}>
+                              {typeof data.price === "string"
+                                ? data.price
+                                : `₹${data.price?.toLocaleString("en-IN")}`}
+                            </div>
+
+                            {/* Rating */}
+                            {data.rating && (
+                              <div className="flex items-center gap-2 mb-4 text-gray-700">
+                                <span className="text-yellow-500">⭐</span>
+                                <span>{data.rating}</span>
+                                {data.reviews && <span className="text-gray-600">({data.reviews} reviews)</span>}
+                              </div>
+                            )}
+
+                            {/* Link Button */}
+                            {data.link && (
+                              <a
+                                href={data.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`block w-full py-2 px-4 rounded-lg font-semibold text-center transition-colors ${
+                                  isLowestPrice
+                                    ? "bg-green-600 hover:bg-green-700 text-white"
+                                    : "bg-black hover:bg-gray-800 text-white"
+                                }`}
+                              >
+                                View on {label}
+                              </a>
+                            )}
+                          </>
+                        ) : (
+                          <div className="text-center py-12">
+                            <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                            <p className="text-gray-700 font-medium">Not Available</p>
+                            <p className="text-gray-600 text-sm">Product not found on {label}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Price Summary Table */}
+              {comparisonData && (
+                <div className="bg-white/40 rounded-lg border border-white/30 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-white/30 bg-white/60">
+                        <th className="text-left py-4 px-6 text-gray-900 font-semibold">Source</th>
+                        <th className="text-left py-4 px-6 text-gray-900 font-semibold">Price</th>
+                        <th className="text-left py-4 px-6 text-gray-900 font-semibold">Rating</th>
+                        <th className="text-left py-4 px-6 text-gray-900 font-semibold">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { label: "Local DB", data: comparisonData.sources.local },
+                        { label: "Amazon", data: comparisonData.sources.amazon },
+                        { label: "Flipkart", data: comparisonData.sources.flipkart }
+                      ].map(({ label, data }) => (
+                        <tr key={label} className="border-b border-white/20 hover:bg-white/50">
+                          <td className="py-4 px-6 text-gray-900 font-medium">{label}</td>
+                          <td className={`py-4 px-6 font-semibold ${lowestPriceSource?.source === data?.source ? "text-green-600" : "text-gray-900"}`}>
+                            {data ? (typeof data.price === "string" ? data.price : `₹${data.price}`) : "—"}
+                          </td>
+                          <td className="py-4 px-6 text-gray-700">
+                            {data?.rating ? `⭐ ${data.rating}` : "—"}
+                          </td>
+                          <td className="py-4 px-6">
+                            {data?.link ? (
+                              <a
+                                href={data.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-700 underline"
+                              >
+                                Visit
+                              </a>
+                            ) : (
+                              <span className="text-gray-600">N/A</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-          </div>
-        </div>
+          )}
 
-        {/* Comparison cards grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {comparisonResults.map((result, idx) => (
-            <ComparisonProductCard
-              key={idx}
-              storeName={result.storeName}
-              price={result.price}
-              rating={result.rating}
-              deliveryDate={result.deliveryDate}
-              isHighlighted={result.isHighlighted || false}
-            />
-          ))}
-        </div>
-
-        {/* Additional details */}
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Product details */}
-          <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-6">
-            <h3 className="text-white font-semibold mb-4">Product Details</h3>
-            <ul className="space-y-3 text-slate-300 text-sm">
-              <li className="flex justify-between">
-                <span>Brand:</span>
-                <span className="font-medium">Nike</span>
-              </li>
-              <li className="flex justify-between">
-                <span>Type:</span>
-                <span className="font-medium">Running Shoes</span>
-              </li>
-              <li className="flex justify-between">
-                <span>Color:</span>
-                <span className="font-medium">Black & Red</span>
-              </li>
-              <li className="flex justify-between">
-                <span>Material:</span>
-                <span className="font-medium">Synthetic & Mesh</span>
-              </li>
-            </ul>
-          </div>
-
-          {/* Why compare */}
-          <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-6">
-            <h3 className="text-white font-semibold mb-4">💡 Why Compare?</h3>
-            <ul className="space-y-2 text-slate-300 text-sm">
-              <li>✓ Save up to 30% on your purchases</li>
-              <li>✓ Find the fastest delivery option</li>
-              <li>✓ Check seller ratings & reviews</li>
-              <li>✓ Compare warranty & return policies</li>
-            </ul>
-          </div>
-        </div>
-
-        {/* Comparison table */}
-        <div className="mt-12">
-          <h3 className="text-white font-semibold mb-6">Detailed Comparison</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-slate-300">
-              <thead>
-                <tr className="border-b border-slate-700">
-                  <th className="text-left py-3 px-4 text-white font-medium">Feature</th>
-                  {comparisonResults.map((result, idx) => (
-                    <th
-                      key={idx}
-                      className={`text-left py-3 px-4 font-medium ${
-                        result.isHighlighted ? "text-green-400" : "text-white"
-                      }`}
-                    >
-                      {result.storeName}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-slate-700 hover:bg-slate-700/50">
-                  <td className="py-3 px-4">Price</td>
-                  {comparisonResults.map((result, idx) => (
-                    <td
-                      key={idx}
-                      className={`py-3 px-4 font-semibold ${
-                        result.isHighlighted ? "text-green-400" : ""
-                      }`}
-                    >
-                      {result.price}
-                    </td>
-                  ))}
-                </tr>
-                <tr className="border-b border-slate-700 hover:bg-slate-700/50">
-                  <td className="py-3 px-4">Delivery Time</td>
-                  {comparisonResults.map((result, idx) => (
-                    <td key={idx} className="py-3 px-4">
-                      {result.deliveryDate}
-                    </td>
-                  ))}
-                </tr>
-                <tr className="border-b border-slate-700 hover:bg-slate-700/50">
-                  <td className="py-3 px-4">Rating</td>
-                  {comparisonResults.map((result, idx) => (
-                    <td key={idx} className="py-3 px-4">
-                      ⭐ {result.rating}
-                    </td>
-                  ))}
-                </tr>
-                <tr className="hover:bg-slate-700/50">
-                  <td className="py-3 px-4">Warranty</td>
-                  {comparisonResults.map((result, idx) => (
-                    <td key={idx} className="py-3 px-4">
-                      1 Year
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          {/* Empty State */}
+          {!comparisonData && !loading && !error && (
+            <div className="text-center py-16">
+              <Search className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">Start Comparing</h3>
+              <p className="text-gray-700">Enter a product name above to compare prices across stores</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

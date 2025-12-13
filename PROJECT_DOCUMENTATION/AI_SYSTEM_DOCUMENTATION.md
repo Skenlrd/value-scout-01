@@ -614,8 +614,7 @@ return (
         </div>
       </TabsContent>
     ))}
-  </Tabs>
-);
+  </Tabs>);
 ```
 
 #### 5.5 Modal Display Features

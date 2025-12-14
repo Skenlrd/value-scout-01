@@ -1,5 +1,8 @@
-import { useState, useEffect } from "react";
-import { Search, AlertCircle } from "lucide-react";
+import { useState } from "react";
+import { Search, AlertCircle, RefreshCw } from "lucide-react";
+import LoadingWidget from "@/components/LoadingWidget";
+import ComparisonProductCard from "@/components/ComparisonProductCard";
+import ComparisonTable from "@/components/ComparisonTable";
 
 interface ComparisonSource {
   source: string;
@@ -13,18 +16,16 @@ interface ComparisonSource {
 
 interface ComparisonResult {
   query: string;
-  sources: {
-    local: ComparisonSource | null;
-    amazon: ComparisonSource | null;
-    flipkart: ComparisonSource | null;
-  };
+  products: ComparisonSource[];
   timestamp: string;
 }
 
 const Compare = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
+  const [findingMore, setFindingMore] = useState(false);
   const [error, setError] = useState("");
+  const [noMoreResults, setNoMoreResults] = useState(false);
   const [comparisonData, setComparisonData] = useState<ComparisonResult | null>(null);
 
   const handleSearch = async () => {
@@ -37,6 +38,7 @@ const Compare = () => {
     setLoading(true);
     setError("");
     setComparisonData(null);
+    setNoMoreResults(false);
 
     try {
       const response = await fetch(
@@ -56,15 +58,53 @@ const Compare = () => {
     }
   };
 
-  // Determine which source has the lowest price
+  // Find more deals - search again and add new unique results
+  const handleFindMore = async () => {
+    if (!comparisonData) return;
+    
+    setFindingMore(true);
+    setNoMoreResults(false);
+    
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/compare-prices?q=${encodeURIComponent(comparisonData.query)}&offset=${comparisonData.products.length}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch more deals");
+      }
+
+      const data = await response.json();
+      
+      // Filter out duplicates based on source + title combination
+      const existingKeys = new Set(
+        comparisonData.products.map(p => `${p.source}-${p.title}`)
+      );
+      
+      const newProducts = data.products.filter(
+        (p: ComparisonSource) => !existingKeys.has(`${p.source}-${p.title}`)
+      );
+      
+      if (newProducts.length === 0) {
+        setNoMoreResults(true);
+      } else {
+        setComparisonData({
+          ...comparisonData,
+          products: [...comparisonData.products, ...newProducts]
+        });
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error finding more deals");
+    } finally {
+      setFindingMore(false);
+    }
+  };
+
+  // Get lowest price source
   const getLowestPriceSource = () => {
     if (!comparisonData) return null;
 
-    const sources = [
-      comparisonData.sources.local,
-      comparisonData.sources.amazon,
-      comparisonData.sources.flipkart
-    ].filter(s => s && s.price);
+    const sources = comparisonData.products.filter(s => s && s.price);
 
     if (sources.length === 0) return null;
 
@@ -82,208 +122,132 @@ const Compare = () => {
 
   const lowestPriceSource = getLowestPriceSource();
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-[#eaf6f2] to-[#b6c9c3]">
-      {/* Header */}
-      <div className="text-center py-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">Price Comparison</h1>
-      </div>
+  // Get available sources for display
+  const getAvailableSources = () => {
+    if (!comparisonData) return [];
+    return comparisonData.products;
+  };
 
-      {/* Search Section - Large Centered Bar like AI Style Builder */}
-      <div className="flex flex-col items-center justify-center px-4 py-8">
-        <div className="w-full max-w-2xl">
-          <div className="relative mb-8">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-600 h-5 w-5" />
-            <input
-              type="text"
-              placeholder="Search for deals, prices, and more..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && handleSearch()}
-              className="w-full pl-12 pr-6 py-3 bg-white/80 text-gray-900 placeholder-gray-600 rounded-full focus:outline-none focus:ring-2 focus:ring-teal-400 focus:bg-white"
-            />
+  const availableSources = getAvailableSources();
+
+  return (
+    <div className="min-h-screen bg-transparent">
+      <LoadingWidget isLoading={loading} />
+
+      {/* Header - Same as Style Builder */}
+      <div className="px-6 sm:px-10 md:px-16 lg:px-24 py-10">
+        <div className="max-w-7xl mx-auto text-center">
+          <h1 className="text-3xl md:text-4xl font-semibold text-gray-800 mb-3">
+            Compare Deals
+          </h1>
+          <p className="text-gray-700 mb-8 text-sm md:text-base">
+            Find the best deals across multiple retailers
+          </p>
+
+          {/* Search Bar - Same style as Style Builder */}
+          <div className="max-w-2xl mx-auto mb-10">
+            <div className="w-full glass-effect rounded-full">
+              <form 
+                className="relative flex items-center h-16 md:h-20 px-6"
+                onSubmit={(e) => { e.preventDefault(); handleSearch(); }}
+              >
+                <Search 
+                  className="absolute left-6 h-6 w-6 text-muted-foreground cursor-pointer hover:text-gray-700 transition-colors" 
+                  onClick={handleSearch}
+                />
+                <input
+                  type="text"
+                  placeholder="Search for deals, styles, and more..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full h-full pl-14 pr-6 bg-transparent border-none text-lg font-medium focus:outline-none"
+                />
+              </form>
+            </div>
           </div>
 
           {/* Error Message */}
           {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-8 flex items-center gap-2">
+            <div className="max-w-2xl mx-auto bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-8 flex items-center gap-2">
               <AlertCircle className="h-5 w-5" />
               {error}
             </div>
           )}
 
-          {/* Loading State */}
-          {loading && (
-            <div className="text-center py-12">
-              <div className="inline-flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full border-2 border-teal-600 border-t-transparent animate-spin"></div>
-                <span className="text-gray-700">Comparing prices...</span>
-              </div>
-            </div>
-          )}
-
-          {/* Comparison Results */}
+          {/* Results Section */}
           {comparisonData && !loading && (
-            <div className="mt-12">
+            <div className="mt-10 space-y-10">
               {/* Product Header */}
-              <div className="mb-12 p-6 bg-white/40 rounded-lg border border-white/30">
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">{comparisonData.query}</h2>
-                <p className="text-gray-700">Best prices from Local DB, Amazon, and Flipkart</p>
+              <div className="p-6 bg-white/50 backdrop-blur-sm rounded-2xl border border-white/40 shadow-lg">
+                <h2 className="text-2xl font-black text-gray-900 mb-2">
+                  Results for "{comparisonData.query}"
+                </h2>
+                <p className="text-gray-600">
+                  Found prices from <span className="font-bold text-brand-scout">{availableSources.length}</span> sources
+                </p>
               </div>
 
-              {/* Comparison Cards Grid - 3 columns */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-                {[
-                  { key: "local", label: "Local DB", data: comparisonData.sources.local },
-                  { key: "amazon", label: "Amazon", data: comparisonData.sources.amazon },
-                  { key: "flipkart", label: "Flipkart", data: comparisonData.sources.flipkart }
-                ].map(({ key, label, data }) => {
-                  const isLowestPrice = data && lowestPriceSource && data.source === lowestPriceSource.source;
-                  
-                  return (
-                    <div
-                      key={key}
-                      className={`rounded-lg overflow-hidden border-2 transition-all bg-white/60 backdrop-blur-sm ${
-                        isLowestPrice
-                          ? "border-green-500 shadow-lg"
-                          : "border-white/30"
-                      }`}
-                    >
-                      {/* Store Header */}
-                      <div className={`px-6 py-4 ${isLowestPrice ? "bg-green-100" : "bg-white/40"}`}>
-                        <h3 className="text-lg font-bold text-gray-900 flex items-center justify-between">
-                          {label}
-                          {isLowestPrice && (
-                            <span className="text-xs bg-green-600 text-white px-3 py-1 rounded-full font-semibold">
-                              Best Price
-                            </span>
-                          )}
-                        </h3>
-                      </div>
-
-                      {/* Card Content */}
-                      <div className="p-6">
-                        {data ? (
-                          <>
-                            {/* Image */}
-                            {data.image && (
-                              <div className="mb-4 h-48 bg-gray-200 rounded-lg overflow-hidden flex items-center justify-center">
-                                <img
-                                  src={data.image}
-                                  alt={data.title || "Product"}
-                                  className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    e.currentTarget.src = "https://via.placeholder.com/200?text=No+Image";
-                                  }}
-                                />
-                              </div>
-                            )}
-
-                            {/* Title */}
-                            <h4 className="text-gray-900 font-semibold mb-3 line-clamp-2 text-sm">
-                              {data.title}
-                            </h4>
-
-                            {/* Price */}
-                            <div className={`text-3xl font-bold mb-4 ${isLowestPrice ? "text-green-600" : "text-gray-900"}`}>
-                              {typeof data.price === "string"
-                                ? data.price
-                                : `₹${data.price?.toLocaleString("en-IN")}`}
-                            </div>
-
-                            {/* Rating */}
-                            {data.rating && (
-                              <div className="flex items-center gap-2 mb-4 text-gray-700">
-                                <span className="text-yellow-500">⭐</span>
-                                <span>{data.rating}</span>
-                                {data.reviews && <span className="text-gray-600">({data.reviews} reviews)</span>}
-                              </div>
-                            )}
-
-                            {/* Link Button */}
-                            {data.link && (
-                              <a
-                                href={data.link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className={`block w-full py-2 px-4 rounded-lg font-semibold text-center transition-colors ${
-                                  isLowestPrice
-                                    ? "bg-green-600 hover:bg-green-700 text-white"
-                                    : "bg-black hover:bg-gray-800 text-white"
-                                }`}
-                              >
-                                View on {label}
-                              </a>
-                            )}
-                          </>
-                        ) : (
-                          <div className="text-center py-12">
-                            <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                            <p className="text-gray-700 font-medium">Not Available</p>
-                            <p className="text-gray-600 text-sm">Product not found on {label}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Price Summary Table */}
-              {comparisonData && (
-                <div className="bg-white/40 rounded-lg border border-white/30 overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-white/30 bg-white/60">
-                        <th className="text-left py-4 px-6 text-gray-900 font-semibold">Source</th>
-                        <th className="text-left py-4 px-6 text-gray-900 font-semibold">Price</th>
-                        <th className="text-left py-4 px-6 text-gray-900 font-semibold">Rating</th>
-                        <th className="text-left py-4 px-6 text-gray-900 font-semibold">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[
-                        { label: "Local DB", data: comparisonData.sources.local },
-                        { label: "Amazon", data: comparisonData.sources.amazon },
-                        { label: "Flipkart", data: comparisonData.sources.flipkart }
-                      ].map(({ label, data }) => (
-                        <tr key={label} className="border-b border-white/20 hover:bg-white/50">
-                          <td className="py-4 px-6 text-gray-900 font-medium">{label}</td>
-                          <td className={`py-4 px-6 font-semibold ${lowestPriceSource?.source === data?.source ? "text-green-600" : "text-gray-900"}`}>
-                            {data ? (typeof data.price === "string" ? data.price : `₹${data.price}`) : "—"}
-                          </td>
-                          <td className="py-4 px-6 text-gray-700">
-                            {data?.rating ? `⭐ ${data.rating}` : "—"}
-                          </td>
-                          <td className="py-4 px-6">
-                            {data?.link ? (
-                              <a
-                                href={data.link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-700 underline"
-                              >
-                                Visit
-                              </a>
-                            ) : (
-                              <span className="text-gray-600">N/A</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              {/* PART 2: SIMILAR PRODUCTS ROW */}
+              <div>
+                <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                  <span className="w-1.5 h-6 bg-gradient-to-b from-brand-scout to-emerald-500 rounded-full"></span>
+                  Compare Prices
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+                  {/* Product Cards */}
+                  {availableSources.map((source, index) => (
+                    <ComparisonProductCard
+                      key={`${source.source}-${index}`}
+                      source={source.source}
+                      title={source.title}
+                      price={source.price}
+                      image={source.image}
+                      link={source.link}
+                      rating={source.rating}
+                      isLowest={lowestPriceSource?.source === source.source && lowestPriceSource?.title === source.title}
+                    />
+                  ))}
                 </div>
-              )}
+
+                {/* Find More Deals Button */}
+                <div className="mt-8 flex flex-col items-center gap-3">
+                  {noMoreResults ? (
+                    <p className="text-gray-500 text-sm">No more deals found for this search</p>
+                  ) : (
+                    <button
+                      onClick={handleFindMore}
+                      disabled={findingMore}
+                      className="px-6 py-3 bg-brand-scout hover:bg-teal-700 text-white rounded-xl font-semibold flex items-center gap-2 transition-all disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-5 h-5 ${findingMore ? 'animate-spin' : ''}`} />
+                      {findingMore ? 'Searching...' : 'Find More Deals'}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* PART 3: DIFFERENTIAL AESTHETIC TABLE */}
+              <div>
+                <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                  <span className="w-1.5 h-6 bg-gradient-to-b from-brand-scout to-emerald-500 rounded-full"></span>
+                  Detailed Comparison
+                </h3>
+                <ComparisonTable
+                  sources={availableSources}
+                  lowestPriceSource={lowestPriceSource}
+                />
+              </div>
             </div>
           )}
 
           {/* Empty State */}
           {!comparisonData && !loading && !error && (
             <div className="text-center py-16">
-              <Search className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">Start Comparing</h3>
-              <p className="text-gray-700">Enter a product name above to compare prices across stores</p>
+              <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-700 mb-2">Start Comparing</h3>
+              <p className="text-gray-500 text-sm">
+                Enter a product name to compare prices across stores
+              </p>
             </div>
           )}
         </div>

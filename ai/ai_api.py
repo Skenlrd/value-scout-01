@@ -6,6 +6,7 @@ Provides outfit recommendations using cosine similarity on CLIP embeddings
 from flask import Flask, jsonify
 from flask_cors import CORS
 from pymongo import MongoClient
+import os
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -154,7 +155,7 @@ def health_check():
 def root():
     """API documentation"""
     return jsonify({
-        "name": "AI Style Builder API",
+        "name": "Style Builder API",
         "version": "1.0",
         "endpoints": {
             "GET /api/style-builder/<product_id>": "Get outfit recommendations for a product",
@@ -166,7 +167,7 @@ def root():
 
 if __name__ == '__main__':
     print("\n" + "="*60)
-    print("AI Style Builder API")
+    print("Style Builder API")
     print("="*60)
     print("Server starting on http://localhost:5000")
     print("\nEndpoints:")
@@ -174,4 +175,8 @@ if __name__ == '__main__':
     print("  GET /api/health")
     print("="*60 + "\n")
     
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    host = os.getenv("AI_API_HOST", "127.0.0.1")
+    port = int(os.getenv("AI_API_PORT", "5000"))
+    debug = os.getenv("FLASK_DEBUG", "0") == "1"
+
+    app.run(host=host, port=port, debug=debug)

@@ -333,7 +333,7 @@ NODE_ENV=development
 ### SerpApi Key
 Located in `main_api_server.js` line 17:
 ```javascript
-const SERPAPI_KEY = "9c9ebdb9f7851dff0077e2ca096e4b82023ddbbb7b63fa5264ecaa0550ccdab5";
+const SERPAPI_KEY = process.env.SERPAPI_KEY;
 ```
 
 ---

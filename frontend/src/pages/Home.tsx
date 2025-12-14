@@ -30,6 +30,7 @@ interface WishlistItem {
   link?: string;
   image?: string;
   thumbnail?: string;
+  targetPrice?: string | number;
 }
 
 const Home = () => {
@@ -74,38 +75,87 @@ const Home = () => {
     return brandNames.some(brand => name.toLowerCase().includes(brand.toLowerCase()));
   };
 
-  const filterResults = (results: SearchResult[]): SearchResult[] => {
-    // Temporarily less restrictive filter - just check if it has a price/link
+  // Smart filter based on search query
+  const filterResults = (results: SearchResult[], query: string): SearchResult[] => {
+    const lowerQuery = query.toLowerCase();
+    
+    // Check if searching for footwear
+    const isFootwearSearch = ["shoe", "sneaker", "jordan", "air max", "dunk", "force", "boot", "trainer", "yeezy", "retro"].some(kw => lowerQuery.includes(kw));
+    
     return results.filter(product => {
       const hasLink = product.link && product.link.length > 0;
-      const hasPrice = product.price !== undefined && product.price !== null;
-      return hasLink; // Just need a link
+      if (!hasLink) return false;
+      
+      const name = (product.productName || product.title || "").toLowerCase();
+      
+      // Always exclude perfumes, fragrances, etc.
+      const excludeItems = ["perfume", "fragrance", "deodorant", "cologne", "edt", "edp", "spray", "mist", "scent"];
+      if (excludeItems.some(item => name.includes(item))) {
+        return false;
+      }
+      
+      // If searching for footwear, only show footwear
+      if (isFootwearSearch) {
+        const footwearKeywords = ["shoe", "sneaker", "boot", "trainer", "footwear", "running", "basketball", "athletic"];
+        const hasFootwear = footwearKeywords.some(kw => name.includes(kw));
+        
+        // Exclude non-footwear items
+        const nonFootwearItems = ["shirt", "t-shirt", "tshirt", "jacket", "hoodie", "cap", "hat", "bag", "wallet", "watch", "belt", "pants", "shorts"];
+        const isNonFootwear = nonFootwearItems.some(item => name.includes(item));
+        
+        return hasFootwear && !isNonFootwear;
+      }
+      
+      return true;
     });
   };
 
-  // Fetch wishlist on component mount
+  // Fetch wishlist on component mount and when user changes
   useEffect(() => {
-    fetchWishlist();
     fetchTrendingDeals();
     fetchLowestDeals();
   }, []);
 
+  // Fetch wishlist when user authenticates
+  useEffect(() => {
+    if (userId) {
+      fetchWishlist();
+    } else {
+      setWishlistItems([]);
+      setWishlist(new Set());
+      setWishlistLoading(false);
+    }
+  }, [userId]);
+
   const fetchWishlist = async () => {
+    if (!userId) {
+      console.log("No userId, skipping wishlist fetch");
+      return;
+    }
+    
     setWishlistLoading(true);
+    console.log(`Fetching wishlist for userId: ${userId}`);
     try {
-      const response = await fetch(
-        `http://localhost:8000/api/wishlist/${userId}`
-      );
+      const url = `http://localhost:8000/api/wishlist/${userId}`;
+      console.log(`Fetching from: ${url}`);
+      const response = await fetch(url);
+      
       if (response.ok) {
         const data = await response.json();
-        setWishlistItems(data || []);
+        console.log("Wishlist data received:", data);
+        setWishlistItems(Array.isArray(data) ? data : (data.items || []));
         
         // Populate wishlist set for UI indicators
         const wishlistSet = new Set<string>();
-        (data || []).forEach((item: WishlistItem) => {
+        const items = Array.isArray(data) ? data : (data.items || []);
+        items.forEach((item: WishlistItem) => {
           wishlistSet.add(item._id || item.title);
         });
         setWishlist(wishlistSet);
+      } else {
+        console.error("Failed to fetch wishlist, status:", response.status);
+        const errorData = await response.json();
+        console.error("Error response:", errorData);
       }
     } catch (err) {
       console.error("Failed to fetch wishlist:", err);
@@ -138,12 +188,12 @@ const Home = () => {
     setLowestLoading(true);
     try {
       const response = await fetch(
-        "http://localhost:8000/api/external-search?q=adidas"
+        "http://localhost:8000/api/lowest-this-month"
       );
       if (response.ok) {
         const data = await response.json();
-        if (data.all && Array.isArray(data.all)) {
-          const filtered = filterResults(data.all).slice(0, 4);
+        if (data.shoes && Array.isArray(data.shoes)) {
+          const filtered = filterResults(data.shoes).slice(0, 4);
           setLowestDeals(filtered);
         }
       }
@@ -242,8 +292,8 @@ const Home = () => {
       console.log("Search response:", data);
 
       if (data.all && Array.isArray(data.all)) {
-        // Filter to show only brand-name fashion/shoes
-        const filteredResults = filterResults(data.all);
+        // Filter to show only relevant results based on search query
+        const filteredResults = filterResults(data.all, query);
         console.log("Filtered results:", filteredResults);
         
         if (filteredResults.length > 0) {
@@ -416,16 +466,15 @@ const Home = () => {
         )}
 
         <div className="text-center max-w-2xl mx-auto mb-16">
-          <h2 className="text-3xl font-bold mb-4">Discover Your Perfect Style</h2>
-          <p className="text-gray-600 text-lg">
-            Compare deals, build your AI-powered wardrobe, and shop smarter with
-            ValueScout.
+          <h2 className="text-4xl font-bold mb-4">Discover Your Perfect Style</h2>
+          <p className="text-gray-600 text-xl">
+            Compare deals, build your wardrobe, and shop smarter with ValueScout.
           </p>
         </div>
 
         {/* Top Trending Deals Section */}
         <section className="mb-16">
-          <h2 className="text-2xl font-bold mb-6">Top Trending Deals</h2>
+          <h2 className="text-3xl font-bold mb-6">Top Trending Deals</h2>
           {trendingLoading ? (
             <div className="text-center py-12">
               <div className="inline-flex items-center gap-3">
@@ -463,7 +512,7 @@ const Home = () => {
 
         {/* Lowest This Month Section */}
         <section className="mb-16">
-          <h2 className="text-2xl font-bold mb-6">Lowest This Month</h2>
+          <h2 className="text-3xl font-bold mb-6">Lowest This Month</h2>
           {lowestLoading ? (
             <div className="text-center py-12">
               <div className="inline-flex items-center gap-3">
@@ -501,7 +550,7 @@ const Home = () => {
 
         {/* Wishlist Section */}
         <section>
-          <h2 className="text-2xl font-bold mb-6">
+          <h2 className="text-3xl font-bold mb-6">
             Your Wishlist - Price Alerts
           </h2>
           {wishlistLoading ? (
@@ -513,14 +562,16 @@ const Home = () => {
             </div>
           ) : wishlistItems.length > 0 ? (
             <div className="overflow-x-auto pb-4">
-              <div className="flex gap-4">
+              <div className="flex gap-6 min-w-min">
                 {wishlistItems.map((item, index) => (
                   <WishlistCard
                     key={index}
                     name={item.title}
+                    image={item.image}
                     currentPrice={typeof item.price === "string" ? item.price : `₹${item.price || "N/A"}`}
                     priceChange={`From ${item.source || "Marketplace"}`}
                     details="Saved for later"
+                    targetPrice={item.targetPrice}
                   />
                 ))}
               </div>

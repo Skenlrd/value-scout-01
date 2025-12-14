@@ -54,12 +54,12 @@ const AuthRequiredDialog = ({
           >
             Register
           </button>
-          <AlertDialogAction
+          <button
             onClick={handleLogin}
-            className="bg-black hover:bg-gray-800 text-white"
+            className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-md font-medium transition-colors"
           >
             Login
-          </AlertDialogAction>
+          </button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

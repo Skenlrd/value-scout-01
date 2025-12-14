@@ -9,8 +9,8 @@ interface Product {
   brand?: string;
   category?: string;
   price?: number;
-  imageUrl?: string;
-  productUrl?: string;
+  image?: string;
+  link?: string;
   source?: string;
 }
 
@@ -31,7 +31,7 @@ const StyleBuilderPage: React.FC = () => {
 
     try {
       const resp = await fetch(
-        `http://localhost:8080/api/search?q=${encodeURIComponent(searchQuery)}`
+        `http://localhost:8000/api/search?q=${encodeURIComponent(searchQuery)}`
       );
       const data = await resp.json();
       setResults(Array.isArray(data) ? data : []);
@@ -44,15 +44,15 @@ const StyleBuilderPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#eaf6f2] to-[#b6c9c3]">
+    <div className="min-h-screen bg-transparent">
       <div className="px-6 sm:px-10 md:px-16 lg:px-24 py-10">
         <div className="max-w-7xl mx-auto text-center">
           <h1 className="text-3xl md:text-4xl font-semibold text-gray-800 mb-3">
-            AI Style Builder
+            Style Builder
           </h1>
 
           <p className="text-gray-700 mb-8 text-sm md:text-base">
-            Search clothing and footwear, then tap the AI icon on any product to
+            Search clothing and footwear, then tap the sparkle icon on any product to
             generate matching outfit ideas.
           </p>
 
@@ -80,8 +80,8 @@ const StyleBuilderPage: React.FC = () => {
                 productId={product._id}
                 productName={product.productName}
                 price={product.price}
-                imageUrl={product.imageUrl}
-                productUrl={product.productUrl}
+                imageUrl={product.imageUrl || product.image}
+                productUrl={product.productUrl || product.link}
                 source={product.source}
               />
             ))}

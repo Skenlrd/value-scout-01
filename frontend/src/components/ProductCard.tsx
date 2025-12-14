@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Wand2, Heart, ExternalLink, Star } from "lucide-react";
 
 import { Dialog, DialogTrigger, DialogContent } from "./ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogTitle } from "./ui/alert-dialog";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardFooter } from "./ui/card";
@@ -37,7 +38,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
   const displayName = productName ?? name ?? "";
   const [open, setOpen] = useState(false);
   const [showWishlistConfirm, setShowWishlistConfirm] = useState(false);
+  const [wishlistMessage, setWishlistMessage] = useState("");
   const [isAddingToWishlist, setIsAddingToWishlist] = useState(false);
+  const [isInWishlist, setIsInWishlist] = useState(false);
 
   const handleWishlistClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -54,55 +57,86 @@ const ProductCard: React.FC<ProductCardProps> = ({
     }
   };
 
-  // Add to wishlist handler for the Star button
+  // Add to wishlist handler for the Heart button
   const handleAddToWishlist = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
     try {
-      const user = JSON.parse(localStorage.getItem('valuescout_user') || '{}');
+      const userStr = localStorage.getItem('valuescout_user');
+      console.log('📋 valuescout_user from localStorage:', userStr);
+      
+      const user = JSON.parse(userStr || '{}');
+      console.log('👤 Parsed user:', user);
+      
       if (!user.id) {
-        alert('Please login to add to wishlist');
+        setWishlistMessage('Please login to add to wishlist');
+        setShowWishlistConfirm(true);
         return;
       }
+
+      // Check for valid title
+      const title = displayName || 'Unknown Product';
+
+      // Generate a fallback link if none provided
+      const productLink = productUrl || `https://www.google.com/search?q=${encodeURIComponent(title)}`;
+      
+      const payload = {
+        userId: user.id,
+        title: title,
+        price: price,
+        source: source || 'Unknown',
+        link: productLink,
+        image: imageUrl,
+      };
+      console.log('📤 Sending wishlist payload:', payload);
 
       setIsAddingToWishlist(true);
       const response = await fetch('http://localhost:8000/api/wishlist/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          title: displayName,
-          price: price,
-          source: source || 'Unknown',
-          link: productUrl,
-          image: imageUrl,
-        })
+        body: JSON.stringify(payload)
       });
 
+      const data = await response.json();
+      console.log('📥 Wishlist response:', response.status, data);
+
       if (response.ok) {
+        setIsInWishlist(true);
+        setWishlistMessage('Added to wishlist!');
         setShowWishlistConfirm(true);
         setTimeout(() => setShowWishlistConfirm(false), 2500);
+      } else if (response.status === 409) {
+        // Item already in wishlist
+        setIsInWishlist(true);
+        setWishlistMessage('Item already in your wishlist!');
+        setShowWishlistConfirm(true);
       } else {
-        alert('Failed to add to wishlist');
+        setWishlistMessage(`Failed to add to wishlist: ${data.error || 'Unknown error'}`);
+        setShowWishlistConfirm(true);
       }
     } catch (err) {
       console.error('Failed to add to wishlist:', err);
-      alert('Error adding to wishlist');
+      setWishlistMessage('Error adding to wishlist');
+      setShowWishlistConfirm(true);
     } finally {
       setIsAddingToWishlist(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <div className="group cursor-pointer h-full relative">
-        {/* Wishlist Added Confirmation */}
-        {showWishlistConfirm && (
-          <div className="absolute top-2 right-2 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-semibold z-50 animate-pulse">
-            ✓ Added to Wishlist
-          </div>
-        )}
+    <>
+      {/* Wishlist Message Dialog */}
+      <AlertDialog open={showWishlistConfirm} onOpenChange={setShowWishlistConfirm}>
+        <AlertDialogContent>
+          <AlertDialogTitle>Wishlist</AlertDialogTitle>
+          <AlertDialogDescription>{wishlistMessage}</AlertDialogDescription>
+          <AlertDialogAction onClick={() => setShowWishlistConfirm(false)}>OK</AlertDialogAction>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <div className="group cursor-pointer h-full relative">
         <Card className="flex flex-col h-full overflow-hidden hover:shadow-lg transition-shadow">
           {/* Image Section - Clickable */}
           <a 
@@ -144,8 +178,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
               }
             }}
           >
-            <div className="font-semibold text-gray-900 text-sm line-clamp-2 hover:text-gray-700">{displayName}</div>
-            <div className="text-lg font-bold text-black mt-2">{formatPrice(price)}</div>
+            <div className="font-semibold text-gray-900 text-base line-clamp-2 hover:text-gray-700">{displayName}</div>
+            <div className="text-xl font-bold text-black mt-2">{formatPrice(price)}</div>
           </a>
 
           {/* Footer with Actions */}
@@ -172,12 +206,12 @@ const ProductCard: React.FC<ProductCardProps> = ({
               <Button 
                 size="sm" 
                 variant="ghost" 
-                className={`h-8 w-8 p-0 ${showWishlistConfirm ? 'hover:bg-green-100' : 'hover:bg-amber-100'}`}
+                className={`h-8 w-8 p-0 ${isInWishlist ? 'hover:bg-red-100' : 'hover:bg-red-100'}`}
                 title="Add to wishlist"
                 onClick={handleAddToWishlist}
                 disabled={isAddingToWishlist}
               >
-                <Star className={`w-4 h-4 ${showWishlistConfirm ? 'text-green-600 fill-green-600' : 'text-amber-500'}`} />
+                <Heart className={`w-4 h-4 ${isInWishlist ? 'text-red-600 fill-red-600' : 'text-gray-400'}`} />
               </Button>
               
               <DialogTrigger asChild>
@@ -185,7 +219,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
                   size="sm" 
                   variant="ghost" 
                   className="h-8 w-8 p-0 hover:bg-gray-200"
-                  title="AI Style Builder"
+                  title="Style Builder"
                 >
                   <Wand2 className="w-4 h-4 text-black" />
                 </Button>
@@ -208,7 +242,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
       </div>
 
       <DialogContent className="sm:max-w-4xl w-[95vw] p-6">
-        <AIStyleBuilderModalContent baseProductId={productId} />
+        <StyleBuilderModalContent baseProductId={productId} />
       </DialogContent>
     </Dialog>
   );
@@ -217,13 +251,13 @@ const ProductCard: React.FC<ProductCardProps> = ({
 export default ProductCard;
 
 
-// ------------------------ AI MODAL ------------------------ //
+// ------------------------ STYLE MODAL ------------------------ //
 
-interface AIStyleBuilderModalContentProps {
+interface StyleBuilderModalContentProps {
   baseProductId: string;
 }
 
-const AIStyleBuilderModalContent: React.FC<AIStyleBuilderModalContentProps> = ({ baseProductId }) => {
+const StyleBuilderModalContent: React.FC<StyleBuilderModalContentProps> = ({ baseProductId }) => {
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [recommendedProducts, setRecommendedProducts] = useState<any[]>([]);
@@ -242,9 +276,9 @@ const AIStyleBuilderModalContent: React.FC<AIStyleBuilderModalContentProps> = ({
       setError(null);
 
       try {
-        // Call 1 → AI API
+        // Call 1 → Style API
         const resp1 = await fetch(`http://localhost:8000/api/style-builder/${encodeURIComponent(baseProductId)}`);
-        if (!resp1.ok) throw new Error("AI API error: " + resp1.status);
+        if (!resp1.ok) throw new Error("Style API error: " + resp1.status);
 
         const recData = await resp1.json();
         const ids = recData.recommendations?.map((r: any) => r.id) || [];
@@ -319,7 +353,7 @@ const AIStyleBuilderModalContent: React.FC<AIStyleBuilderModalContentProps> = ({
           ✅ {showWishlistConfirm} added to wishlist! You'll get email alerts when the price drops.
         </div>
       )}
-      <h3 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>AI Style Suggestions</h3>
+      <h3 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Style Suggestions</h3>
       {baseCategory && (
         <div style={{ marginBottom: 12, fontSize: 13, color: "#555" }}>
           Base product category: <strong style={{ textTransform: "capitalize" }}>{baseCategory}</strong>
@@ -434,6 +468,8 @@ const AIStyleBuilderModalContent: React.FC<AIStyleBuilderModalContentProps> = ({
         })()
       )}
 
-    </div>
+        </div>
+      </Dialog>
+    </>
   );
 };

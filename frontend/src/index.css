@@ -115,9 +115,13 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
+  html {
+    font-size: 16px;
+  }
+
   body 
   {
-    @apply text-foreground;
+    @apply text-foreground text-base leading-relaxed;
     background: hsl(var(--background));
     background-image: var(--gradient-bg);
     background-attachment: fixed;

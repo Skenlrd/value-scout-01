@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { Heart, ExternalLink, Trash2, TrendingDown } from "lucide-react";
+import { Heart, ExternalLink, Trash2, TrendingDown, CheckCircle2, BellRing } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import useAuth from "@/hooks/useAuth";
 import AuthRequiredDialog from "@/components/AuthRequiredDialog";
@@ -15,7 +16,7 @@ interface WishlistItem {
   link?: string;
   image?: string;
   thumbnail?: string;
-  targetPrice?: number;
+  targetPrice?: number | string | null;
 }
 
 const Wishlist = () => {
@@ -48,7 +49,28 @@ const Wishlist = () => {
       const response = await fetch(`http://localhost:8000/api/wishlist/${userId}`);
       if (response.ok) {
         const data = await response.json();
-        setWishlistItems(data.items || []);
+        const items: WishlistItem[] = data.items || [];
+        setWishlistItems(items);
+
+        // Prefill per-item target price inputs from server so "tracked" state persists across reloads.
+        const nextInputs: { [key: string]: string } = {};
+        const nextAlerts: { [key: string]: number } = {};
+        for (const item of items) {
+          const id = item._id || "";
+          if (!id) continue;
+          const targetNum =
+            typeof item.targetPrice === "number"
+              ? item.targetPrice
+              : typeof item.targetPrice === "string"
+                ? Number(item.targetPrice)
+                : NaN;
+          if (!Number.isNaN(targetNum) && targetNum > 0) {
+            nextInputs[id] = String(targetNum);
+            nextAlerts[id] = targetNum;
+          }
+        }
+        setPriceInputs(nextInputs);
+        setPriceAlerts(nextAlerts);
       } else {
         setError("Failed to load wishlist");
       }
@@ -111,6 +133,12 @@ const Wishlist = () => {
           ...priceAlerts,
           [itemId]: targetPrice,
         });
+
+        // Update local UI immediately (and keep input synced)
+        setWishlistItems((prev) =>
+          prev.map((item) => (item._id === itemId ? { ...item, targetPrice } : item))
+        );
+        setPriceInputs((prev) => ({ ...prev, [itemId]: String(targetPrice) }));
         
         // Show confirmation message
         const item = wishlistItems.find(i => i._id === itemId);
@@ -182,7 +210,9 @@ const Wishlist = () => {
         {priceAlertConfirm && (
           <div className="mb-6 max-w-2xl mx-auto bg-green-50 border border-green-200 rounded-lg shadow-md p-4">
             <div className="flex items-start gap-3">
-              <div className="text-2xl">📧</div>
+              <div className="mt-0.5 text-green-700">
+                <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+              </div>
               <div>
                 <h4 className="font-bold text-green-900">Price Tracked Successfully!</h4>
                 <p className="text-green-800 text-sm mt-1">
@@ -197,10 +227,10 @@ const Wishlist = () => {
         )}
         {/* Header */}
         <div className="mb-12 text-center">
-          <h1 className="text-5xl font-bold text-gray-900 mb-4">
+          <h1 className="text-3xl font-bold text-gray-900 mb-3">
             Wishlist & Price Tracker
           </h1>
-          <p className="text-gray-700 text-lg">
+          <p className="text-gray-700 text-base">
             {wishlistItems.length === 0
               ? "Your wishlist is empty. Start adding items!"
               : `${wishlistItems.length} item${wishlistItems.length !== 1 ? "s" : ""} in your wishlist`}
@@ -220,7 +250,12 @@ const Wishlist = () => {
             {wishlistItems.map((item) => (
               <Card
                 key={item._id}
-                className="bg-white rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-full"
+                className={`rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-full ${
+                  (typeof item.targetPrice === "number" && item.targetPrice > 0) ||
+                  (typeof item.targetPrice === "string" && Number(item.targetPrice) > 0)
+                    ? "bg-amber-50/60 border-amber-200"
+                    : "bg-white"
+                }`}
               >
                 {/* Image Section */}
                 <div className="relative h-64 bg-gray-100 overflow-hidden">
@@ -256,11 +291,32 @@ const Wishlist = () => {
                     {item.title}
                   </h3>
 
+                  {/* Tracked badge */}
+                  {((typeof item.targetPrice === "number" && item.targetPrice > 0) ||
+                    (typeof item.targetPrice === "string" && Number(item.targetPrice) > 0)) && (
+                    <div className="mb-2">
+                      <Badge
+                        variant="outline"
+                        className="w-fit border-amber-200 bg-amber-100/60 text-amber-900"
+                      >
+                        <BellRing className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                        Tracking below ₹
+                        {Number(item.targetPrice).toLocaleString("en-IN")}
+                      </Badge>
+                    </div>
+                  )}
+
                   {/* Price */}
                   <div className="mb-3">
                     <p className="text-2xl font-bold text-black">
                       {typeof item.price === "string" ? item.price : `₹${item.price}`}
                     </p>
+                    {((typeof item.targetPrice === "number" && item.targetPrice > 0) ||
+                      (typeof item.targetPrice === "string" && Number(item.targetPrice) > 0)) && (
+                      <p className="mt-1 text-xs font-medium text-amber-800">
+                        Price tracking enabled
+                      </p>
+                    )}
                   </div>
 
                   {/* Source and Divider */}
@@ -273,7 +329,10 @@ const Wishlist = () => {
                   {/* Price Alert Input */}
                   <div className="mb-4">
                     <label className="block text-xs font-semibold text-gray-700 mb-2">
-                      Set Price Alert
+                      {((typeof item.targetPrice === "number" && item.targetPrice > 0) ||
+                      (typeof item.targetPrice === "string" && Number(item.targetPrice) > 0))
+                        ? "Update Price Tracking"
+                        : "Set Price Alert"}
                     </label>
                     <div className="flex gap-2">
                       <input

@@ -10,15 +10,15 @@ const mongoose = require("mongoose");
 const EMAIL_CONFIG = {
   service: "gmail",
   auth: {
-    user: process.env.EMAIL_USER || "valuescout6@gmail.com",
-    pass: process.env.EMAIL_PASSWORD || "odpf qvdg ulle iism", // App password
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASSWORD,
   },
 };
 
 const mailTransporter = nodemailer.createTransport(EMAIL_CONFIG);
 
 // SerpAPI Key
-const SERPAPI_KEY = process.env.SERPAPI_KEY || "9c9ebdb9f7851dff0077e2ca096e4b82023ddbbb7b63fa5264ecaa0550ccdab5";
+const SERPAPI_KEY = process.env.SERPAPI_KEY || "";
 
 // ============================
 // 1️⃣ FETCH TRACKED ITEMS FROM DB
@@ -72,6 +72,11 @@ async function fetchTrackedItems() {
 async function checkPriceOnAmazon(asin, link) {
   // Try SerpAPI first
   try {
+    if (!SERPAPI_KEY) {
+      console.log("⚠️ SERPAPI_KEY not set; skipping SerpAPI and using HTML fallback");
+      throw new Error("SERPAPI_KEY not configured");
+    }
+
     console.log(`🔍 SerpAPI checking ASIN: ${asin}`);
     const params = {
       engine: "amazon",
@@ -234,6 +239,11 @@ async function sendCombinedEmail(userEmail, droppedItems) {
       return;
     }
 
+    if (!EMAIL_CONFIG.auth.user || !EMAIL_CONFIG.auth.pass) {
+      console.log("⚠️ Email not configured (EMAIL_USER/EMAIL_PASSWORD missing); skipping email send");
+      return;
+    }
+
     const htmlItems = droppedItems
       .map(
         (item) => `
@@ -283,7 +293,7 @@ async function sendCombinedEmail(userEmail, droppedItems) {
     `;
 
     const mailOptions = {
-      from: EMAIL_CONFIG.auth.user,
+      from: process.env.EMAIL_FROM || EMAIL_CONFIG.auth.user,
       to: userEmail,
       subject: `🔥 ${droppedItems.length} Price Drop Alert(s)! — ValueScout`,
       html: htmlBody,

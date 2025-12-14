@@ -266,7 +266,7 @@ app.get("/api/price-tracker/run-now", async (req, res) => {
 ```
 PORT=8000
 MONGO_URI=mongodb://127.0.0.1:27017/value_scout
-SERPAPI_KEY=9c9ebdb9f7851dff0077e2ca096e4b82023ddbbb7b63fa5264ecaa0550ccdab5
+SERPAPI_KEY=your_serpapi_key_here
 EMAIL_USER=valuescout6@gmail.com
 EMAIL_PASSWORD=odpf qvdg ulle iism    # Gmail app password
 ```

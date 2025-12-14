@@ -41,7 +41,7 @@ def allowed_brand(name: str) -> bool:
 
 
 def gen_id(source: str, unique: str) -> str:
-    return f"{source}_" + hashlib.md5(unique.encode()).hexdigest()
+    return f"{source}_" + hashlib.md5(unique.encode(), usedforsecurity=False).hexdigest()
 
 
 def rand_sleep(a=0.8, b=1.8):

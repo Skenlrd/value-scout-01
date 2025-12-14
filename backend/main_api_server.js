@@ -19,7 +19,7 @@ console.log("AI_API_URL:", process.env.AI_API_URL || "not set");
 
 const app = express();
 const PORT = process.env.PORT || 8000;
-const SERPAPI_KEY = "9c9ebdb9f7851dff0077e2ca096e4b82023ddbbb7b63fa5264ecaa0550ccdab5";
+const SERPAPI_KEY = process.env.SERPAPI_KEY || "";
 
 app.use(express.json());
 app.use(cors());
@@ -116,7 +116,7 @@ app.all("/api/debug/send-test-email", async (req, res) => {
     if (!to) return res.status(400).json({ error: "Missing 'to' email" });
 
     const nodemailer = require("nodemailer");
-    const fromAddress = process.env.EMAIL_FROM || `ValueScout <${process.env.EMAIL_USER || "noreply@valuescout.com"}>`;
+    const fromAddress = process.env.EMAIL_FROM || `ValueScout <${process.env.EMAIL_USER || "valuescout6@gmail.com"}>`;
     let transporter;
 
     if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
@@ -222,7 +222,7 @@ app.post("/api/auth/register", async (req, res) => {
     try {
       const nodemailer = require('nodemailer');
 
-      const fromAddress = process.env.EMAIL_FROM || `ValueScout <${process.env.EMAIL_USER || 'noreply@valuescout.com'}>`;
+      const fromAddress = process.env.EMAIL_FROM || `ValueScout <${process.env.EMAIL_USER || 'valuescout6@gmail.com'}>`;
       let transporter;
       
       if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
@@ -315,22 +315,41 @@ app.get("/api/auth/verify-email", async (req, res) => {
   try {
     const { token, email } = req.query;
 
+    console.log(`🔍 Verification attempt - Email: ${email}, Token: ${token}`);
+
     if (!token || !email) {
       return res.status(400).json({ error: "Token and email are required" });
     }
 
     // Find user with verification token
+    const decodedEmail = decodeURIComponent(email).toLowerCase();
+    console.log(`🔍 Looking for user with email: ${decodedEmail}`);
+    
     const user = await User.findOne({
-      email: email.toLowerCase(),
+      email: decodedEmail,
       verificationToken: token
     });
 
     if (!user) {
+      // Try to find user just by email to give better error message
+      const userByEmail = await User.findOne({ email: decodedEmail });
+      if (userByEmail) {
+        if (userByEmail.isEmailVerified) {
+          console.log(`ℹ️ Email already verified: ${decodedEmail}`);
+          return res.status(400).json({ error: "Email is already verified. You can log in." });
+        }
+        console.log(`❌ Token mismatch for: ${decodedEmail}`);
+        console.log(`   Expected token: ${userByEmail.verificationToken}`);
+        console.log(`   Received token: ${token}`);
+      } else {
+        console.log(`❌ No user found with email: ${decodedEmail}`);
+      }
       return res.status(400).json({ error: "Invalid verification token" });
     }
 
     // Check if token has expired
     if (user.verificationTokenExpiry < new Date()) {
+      console.log(`❌ Token expired for: ${decodedEmail}`);
       return res.status(400).json({ error: "Verification token has expired. Please register again." });
     }
 
@@ -340,7 +359,7 @@ app.get("/api/auth/verify-email", async (req, res) => {
     user.verificationTokenExpiry = null;
     await user.save();
 
-    console.log(`✅ Email verified: ${email}`);
+    console.log(`✅ Email verified: ${decodedEmail}`);
 
     res.json({
       message: "Email verified successfully! You can now log in.",
@@ -386,7 +405,7 @@ app.post("/api/auth/resend-verification", async (req, res) => {
     const verificationLink = `${frontendUrl}/verify-email?token=${verificationToken}&email=${encodeURIComponent(email)}`;
 
     const nodemailer = require("nodemailer");
-    const fromAddress = process.env.EMAIL_FROM || `ValueScout <${process.env.EMAIL_USER || "noreply@valuescout.com"}>`;
+    const fromAddress = process.env.EMAIL_FROM || `ValueScout <${process.env.EMAIL_USER || "valuescout6@gmail.com"}>`;
     let transporter;
     if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
       const host = process.env.EMAIL_HOST || "smtp.gmail.com";
@@ -636,6 +655,58 @@ app.delete("/api/price-alerts/:alertId", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/lowest-this-month
+ * Returns lowest priced shoes from Amazon in database (sorted by price)
+ */
+app.get("/api/lowest-this-month", async (req, res) => {
+  try {
+    console.log(`\n📉 Fetching lowest priced shoes from Amazon database`);
+    
+    // Find shoes from Amazon, sorted by price (lowest first)
+    const lowestShoes = await Product.find({
+      source: "Amazon",
+      productName: /shoe|sneaker|boot|sandal|trainer/i
+    })
+    .sort({ price: 1 })
+    .limit(4);
+    
+    // Convert prices to numbers for sorting
+    const formatted = lowestShoes.map(shoe => {
+      let numPrice = shoe.price;
+      if (typeof shoe.price === 'string') {
+        numPrice = parseFloat(shoe.price.replace(/[^\d.]/g, '')) || 0;
+      }
+      return {
+        ...shoe.toObject(),
+        numericPrice: numPrice
+      };
+    });
+    
+    // Sort by numeric price
+    formatted.sort((a, b) => a.numericPrice - b.numericPrice);
+    
+    // Normalize field names: imageUrl -> image, productUrl -> link
+    const normalized = formatted.map(shoe => ({
+      ...shoe,
+      image: shoe.image || shoe.imageUrl,
+      link: shoe.link || shoe.productUrl
+    }));
+    
+    console.log(`✓ Found ${normalized.length} lowest priced shoes from Amazon`);
+    
+    res.json({
+      success: true,
+      count: normalized.length,
+      shoes: normalized.slice(0, 4)
+    });
+    
+  } catch (error) {
+    console.error("❌ Lowest this month error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ==========================================
 // 1️⃣ EXTERNAL SEARCH - SERPAPI INTEGRATION
 // ==========================================
@@ -662,22 +733,40 @@ app.get("/api/external-search", async (req, res) => {
     // Fetch Flipkart results (via Google Shopping)
     const flipkartResults = await fetchFlipkartResults(trimmed);
     
+    // Fetch Nike results (via Google Shopping)
+    const nikeResults = await fetchNikeResults(trimmed);
+    
     // Combine results
-    const combinedResults = [...amazonResults, ...flipkartResults];
+    const combinedResults = [...amazonResults, ...flipkartResults, ...nikeResults];
 
     // Upsert to MongoDB
     if (combinedResults.length > 0) {
       await upsertProductsToMongoDB(combinedResults);
     }
 
-    console.log(`✅ Search complete: ${amazonResults.length} Amazon + ${flipkartResults.length} Flipkart results`);
+    console.log(`✅ Search complete: ${amazonResults.length} Amazon + ${flipkartResults.length} Flipkart + ${nikeResults.length} Nike results`);
+    
+    // Normalize field names across all results
+    const normalizeFields = (items) => items.map(item => ({
+      ...item,
+      image: item.image || item.imageUrl,
+      link: item.link || item.productUrl
+    }));
+    
+    const normalized = {
+      amazon: normalizeFields(amazonResults),
+      flipkart: normalizeFields(flipkartResults),
+      nike: normalizeFields(nikeResults),
+      all: normalizeFields(combinedResults)
+    };
     
     res.json({
       success: true,
       count: combinedResults.length,
-      amazon: amazonResults,
-      flipkart: flipkartResults,
-      all: combinedResults
+      amazon: normalized.amazon,
+      flipkart: normalized.flipkart,
+      nike: normalized.nike,
+      all: normalized.all
     });
 
   } catch (error) {
@@ -690,37 +779,58 @@ app.get("/api/external-search", async (req, res) => {
 // 2️⃣ PRICE COMPARISON - MULTI-SOURCE
 // ==========================================
 /**
- * GET /api/compare-prices?q=query
+ * GET /api/compare-prices?q=query&offset=0
  * Compare prices across Local DB, Amazon, and Flipkart
- * Returns structured data for all three sources
+ * Always returns at least 2 products
+ * offset: Skip first N results (for "Find More Deals")
  */
 app.get("/api/compare-prices", async (req, res) => {
   const q = req.query.q || "";
   const trimmed = String(q).trim();
+  const offset = parseInt(req.query.offset) || 0;
 
   if (!trimmed) {
     return res.status(400).json({ error: "Query parameter 'q' is required" });
   }
 
   try {
-    console.log(`\n⚖️ Comparing prices for: "${trimmed}"`);
+    console.log(`\n⚖️ Comparing prices for: "${trimmed}" (offset: ${offset})`);
 
-    // Run 3 parallel searches
-    const [localResult, amazonResult, flipkartResult] = await Promise.all([
-      searchLocalDB(trimmed),
-      searchAmazonForComparison(trimmed),
-      searchFlipkartForComparison(trimmed)
+    // Run 4 parallel searches - local DB + 3 SerpAPI sources
+    const [localResults, amazonResult, flipkartResult, nikeResult] = await Promise.all([
+      searchLocalDBMultiple(trimmed, offset),
+      searchAmazonForComparison(trimmed, offset),
+      searchFlipkartForComparison(trimmed, offset),
+      searchNikeForComparison(trimmed, offset)
     ]);
 
-    console.log(`✅ Comparison complete`);
+    // Combine all results and ensure at least 2 products
+    const allResults = [
+      ...localResults,
+      amazonResult,
+      flipkartResult,
+      nikeResult
+    ].filter(r => r !== null);
+
+    // Sort by price ascending to get best deals first
+    allResults.sort((a, b) => {
+      const priceA = typeof a.price === "number" ? a.price : parseFloat(String(a.price).replace(/[^\d.]/g, "")) || Infinity;
+      const priceB = typeof b.price === "number" ? b.price : parseFloat(String(b.price).replace(/[^\d.]/g, "")) || Infinity;
+      return priceA - priceB;
+    });
+
+    // Return up to 4 results
+    const topResults = allResults.slice(0, 4);
+
+    if (topResults.length === 0) {
+      return res.status(404).json({ error: "No products found" });
+    }
+
+    console.log(`✅ Comparison complete: ${topResults.length} products found`);
 
     res.json({
       query: trimmed,
-      sources: {
-        local: localResult,
-        amazon: amazonResult,
-        flipkart: flipkartResult
-      },
+      products: topResults,
       timestamp: new Date().toISOString()
     });
 
@@ -731,52 +841,122 @@ app.get("/api/compare-prices", async (req, res) => {
 });
 
 /**
- * Search Local MongoDB for closest match
+ * Search Local MongoDB for multiple matches
+ * Returns array of products from local database with actual source names
+ * offset: Skip first N scored results
  */
-async function searchLocalDB(query) {
+async function searchLocalDBMultiple(query, offset = 0) {
   try {
     console.log("🗂️ Searching local DB...");
+    
+    // Words that indicate it's NOT the product we want (accessories)
+    const excludeWords = ["crease", "protector", "guard", "cleaner", "lace", "insole", "polish", "brush", "spray", "kit", "care", "shield", "tree", "stretcher", "horn", "socks", "sock"];
     
     // Create a regex for case-insensitive partial matching
     const regex = new RegExp(query, "i");
     
-    const product = await Product.findOne({
+    // Get multiple results for smart matching
+    const products = await Product.find({
       $or: [
         { productName: regex },
         { link: regex }
       ]
-    }).sort({ createdAt: -1 });
+    }).sort({ createdAt: -1 }).limit(50);
 
-    if (!product) {
+    if (!products || products.length === 0) {
       console.log("❌ No local product found");
-      return null;
+      return [];
     }
 
-    console.log(`✅ Found in local DB: ${product.productName}`);
+    // Smart matching: find best matches based on query keywords
+    const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    const scoredProducts = [];
 
-    return {
-      source: "Local DB",
-      title: product.productName,
-      price: product.price,
-      image: product.image,
-      link: product.link,
-      asin: product.asin,
-      rating: product.rating,
-      reviews: product.reviews
-    };
+    for (const product of products) {
+      const title = (product.productName || "").toLowerCase();
+      let score = 0;
+      
+      // HARD EXCLUDE: Skip accessories completely
+      let isAccessory = false;
+      for (const word of excludeWords) {
+        if (title.includes(word)) {
+          isAccessory = true;
+          break;
+        }
+      }
+      if (isAccessory) continue;
+      
+      // Count matching keywords
+      for (const word of queryWords) {
+        if (title.includes(word)) score += 2;
+      }
+      
+      // Bonus for exact phrase match
+      if (title.includes(query.toLowerCase())) score += 10;
+      
+      // Bonus if it contains "shoe" or "sneaker"
+      if (title.includes("shoe") || title.includes("sneaker") || title.includes("footwear")) score += 2;
+      
+      // Penalty for "boys", "kids", "children", "girl" if not in query
+      if (!query.toLowerCase().includes("boy") && title.includes("boy")) score -= 10;
+      if (!query.toLowerCase().includes("kid") && title.includes("kid")) score -= 10;
+      if (!query.toLowerCase().includes("child") && title.includes("child")) score -= 10;
+      if (!query.toLowerCase().includes("girl") && title.includes("girl")) score -= 10;
+      if (!query.toLowerCase().includes("women") && title.includes("women")) score -= 5;
+      
+      // Prefer items with images and prices
+      if (product.image) score += 1;
+      if (product.price) score += 1;
+      
+      if (score >= 2) {
+        scoredProducts.push({ product, score });
+      }
+    }
+
+    // Sort by score and skip offset, take next 2-3
+    scoredProducts.sort((a, b) => b.score - a.score);
+    const skipCount = offset > 0 ? Math.floor(offset / 2) : 0; // Skip pairs for each offset
+    const topProducts = scoredProducts.slice(skipCount, skipCount + 3);
+
+    if (topProducts.length === 0) {
+      console.log("❌ No suitable local products found (insufficient score)");
+      return [];
+    }
+
+    const results = topProducts.map(({ product, score }) => {
+      console.log(`✅ Found in local DB: ${product.productName} (source: ${product.source}, score: ${score})`);
+      return {
+        source: product.source || "Local DB", // Show actual website name
+        title: product.productName,
+        price: product.price,
+        image: product.image,
+        link: product.link,
+        asin: product.asin,
+        rating: product.rating,
+        reviews: product.reviews
+      };
+    });
+
+    return results;
 
   } catch (error) {
     console.error("❌ Local DB search error:", error.message);
-    return null;
+    return [];
   }
 }
 
 /**
  * Search Amazon via SerpApi for comparison
+ * Strict filtering to find exact product matches
  */
-async function searchAmazonForComparison(query) {
+async function searchAmazonForComparison(query, offset = 0) {
   try {
     console.log("🔍 Searching Amazon...");
+
+    if (!SERPAPI_KEY) {
+      console.log("⚠️ SERPAPI_KEY not set; skipping Amazon search");
+      return null;
+    }
     
     const url = "https://serpapi.com/search";
     const params = {
@@ -789,26 +969,81 @@ async function searchAmazonForComparison(query) {
     const response = await axios.get(url, { params, timeout: 10000 });
     const data = response.data;
 
-    // Get the first result
-    const item = (data.organic_results || [])[0];
-    if (!item) {
+    const results = data.organic_results || [];
+    if (results.length === 0) {
       console.log("❌ No Amazon results found");
       return null;
     }
 
-    const priceData = item.price;
+    // Words that indicate it's NOT the product we want (accessories)
+    const excludeWords = ["crease", "protector", "guard", "cleaner", "lace", "insole", "polish", "brush", "spray", "kit", "care", "shield", "tree", "stretcher", "horn", "socks", "sock", "set"];
+    
+    // Smart matching: find best match based on query keywords
+    const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    let bestMatch = null;
+    let bestScore = -100;
+
+    for (const item of results.slice(0, 20)) {
+      const title = (item.title || "").toLowerCase();
+      let score = 0;
+      
+      // HARD EXCLUDE: Skip accessories completely
+      let isAccessory = false;
+      for (const word of excludeWords) {
+        if (title.includes(word)) {
+          isAccessory = true;
+          break;
+        }
+      }
+      if (isAccessory) continue;
+      
+      // Count matching keywords
+      for (const word of queryWords) {
+        if (title.includes(word)) score += 3;
+      }
+      
+      // Bonus for exact phrase match
+      if (title.includes(query.toLowerCase())) score += 15;
+      
+      // Bonus if it contains "shoe" or "sneaker"
+      if (title.includes("shoe") || title.includes("sneaker") || title.includes("footwear")) score += 2;
+      
+      // Penalty for "boys", "kids", "children", "girl" if not in query
+      if (!query.toLowerCase().includes("boy") && title.includes("boy")) score -= 15;
+      if (!query.toLowerCase().includes("kid") && title.includes("kid")) score -= 15;
+      if (!query.toLowerCase().includes("child") && title.includes("child")) score -= 15;
+      if (!query.toLowerCase().includes("girl") && title.includes("girl")) score -= 15;
+      if (!query.toLowerCase().includes("women") && title.includes("women")) score -= 8;
+      if (!query.toLowerCase().includes("men") && title.includes("men")) score -= 3;
+      
+      // Prefer items with images and prices
+      if (item.image) score += 1;
+      if (item.price) score += 1;
+      
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = item;
+      }
+    }
+
+    if (!bestMatch || bestScore < 5) {
+      console.log("❌ No suitable Amazon product found (insufficient score)");
+      return null;
+    }
+
+    const priceData = bestMatch.price;
     const price = typeof priceData === "object" ? priceData.raw : priceData;
 
-    console.log(`✅ Found on Amazon: ${item.title}`);
+    console.log(`✅ Found on Amazon: ${bestMatch.title} (score: ${bestScore})`);
 
     return {
       source: "Amazon",
-      title: item.title,
+      title: bestMatch.title,
       price: price,
-      image: item.image,
-      link: item.link,
-      rating: item.rating,
-      reviews: item.review_count
+      image: bestMatch.image,
+      link: bestMatch.link,
+      rating: bestMatch.rating,
+      reviews: bestMatch.review_count
     };
 
   } catch (error) {
@@ -819,10 +1054,16 @@ async function searchAmazonForComparison(query) {
 
 /**
  * Search Flipkart via Google Shopping for comparison
+ * Strict filtering to find exact product matches
  */
-async function searchFlipkartForComparison(query) {
+async function searchFlipkartForComparison(query, offset = 0) {
   try {
     console.log("🔍 Searching Flipkart...");
+
+    if (!SERPAPI_KEY) {
+      console.log("⚠️ SERPAPI_KEY not set; skipping Flipkart search");
+      return null;
+    }
     
     const url = "https://serpapi.com/search";
     const params = {
@@ -835,27 +1076,82 @@ async function searchFlipkartForComparison(query) {
     const response = await axios.get(url, { params, timeout: 10000 });
     const data = response.data;
 
-    // Get the first shopping result
-    const item = (data.shopping_results || [])[0];
-    if (!item) {
+    const results = data.shopping_results || [];
+    if (results.length === 0) {
       console.log("❌ No Flipkart results found");
       return null;
     }
 
-    const priceStr = item.price || "";
-    // Extract numeric price
-    const priceMatch = String(priceStr).match(/[\d.]+/);
-    const price = priceMatch ? parseFloat(priceMatch[0]) : null;
+    // Words that indicate it's NOT the product we want (accessories)
+    const excludeWords = ["crease", "protector", "guard", "cleaner", "lace", "insole", "polish", "brush", "spray", "kit", "care", "shield", "tree", "stretcher", "horn", "socks", "sock", "set"];
 
-    console.log(`✅ Found on Flipkart: ${item.title}`);
+    // Smart matching: find best match based on query keywords
+    const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    let bestMatch = null;
+    let bestScore = -100;
+
+    for (const item of results.slice(0, 20)) {
+      const title = (item.title || "").toLowerCase();
+      let score = 0;
+      
+      // HARD EXCLUDE: Skip accessories completely
+      let isAccessory = false;
+      for (const word of excludeWords) {
+        if (title.includes(word)) {
+          isAccessory = true;
+          break;
+        }
+      }
+      if (isAccessory) continue;
+      
+      // Count matching keywords
+      for (const word of queryWords) {
+        if (title.includes(word)) score += 3;
+      }
+      
+      // Bonus for exact phrase match
+      if (title.includes(query.toLowerCase())) score += 15;
+      
+      // Bonus if it contains "shoe" or "sneaker"
+      if (title.includes("shoe") || title.includes("sneaker") || title.includes("footwear")) score += 2;
+      
+      // Penalty for "boys", "kids", "children", "girl" if not in query
+      if (!query.toLowerCase().includes("boy") && title.includes("boy")) score -= 15;
+      if (!query.toLowerCase().includes("kid") && title.includes("kid")) score -= 15;
+      if (!query.toLowerCase().includes("child") && title.includes("child")) score -= 15;
+      if (!query.toLowerCase().includes("girl") && title.includes("girl")) score -= 15;
+      if (!query.toLowerCase().includes("women") && title.includes("women")) score -= 8;
+      if (!query.toLowerCase().includes("men") && title.includes("men")) score -= 3;
+      
+      // Prefer items with images and prices
+      if (item.image) score += 1;
+      if (item.price) score += 1;
+      
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = item;
+      }
+    }
+
+    if (!bestMatch || bestScore < 5) {
+      console.log("❌ No suitable Flipkart product found (insufficient score)");
+      return null;
+    }
+
+    const priceStr = bestMatch.price || "";
+    // Extract numeric price
+    const priceMatch = String(priceStr).match(/[\d,]+/);
+    const price = priceMatch ? parseFloat(priceMatch[0].replace(/,/g, "")) : null;
+
+    console.log(`✅ Found on Flipkart: ${bestMatch.title} (score: ${bestScore})`);
 
     return {
       source: "Flipkart",
-      title: item.title,
+      title: bestMatch.title,
       price: price,
-      image: item.image,
-      link: item.link,
-      rating: item.rating,
+      image: bestMatch.image,
+      link: bestMatch.link,
+      rating: bestMatch.rating,
       reviews: null
     };
 
@@ -866,10 +1162,190 @@ async function searchFlipkartForComparison(query) {
 }
 
 /**
+ * Search Nike via Google Shopping for comparison
+ * Strict filtering to find exact product matches
+ */
+async function searchNikeForComparison(query, offset = 0) {
+  try {
+    console.log("🔍 Searching Nike...");
+
+    if (!SERPAPI_KEY) {
+      console.log("⚠️ SERPAPI_KEY not set; skipping Nike search");
+      return null;
+    }
+    
+    const url = "https://serpapi.com/search";
+    const params = {
+      engine: "google_shopping",
+      api_key: SERPAPI_KEY,
+      q: `${query} nike`,
+      gl: "in"
+    };
+
+    const response = await axios.get(url, { params, timeout: 10000 });
+    const data = response.data;
+
+    const results = data.shopping_results || [];
+    if (results.length === 0) {
+      console.log("❌ No Nike results found");
+      return null;
+    }
+
+    // Words that indicate it's NOT the product we want (accessories)
+    const excludeWords = ["crease", "protector", "guard", "cleaner", "lace", "insole", "polish", "brush", "spray", "kit", "care", "shield", "tree", "stretcher", "horn", "socks", "sock", "set"];
+
+    // Smart matching: find best match based on query keywords
+    const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    let bestMatch = null;
+    let bestScore = -100;
+
+    for (const item of results.slice(0, 20)) {
+      const title = (item.title || "").toLowerCase();
+      let score = 0;
+      
+      // HARD EXCLUDE: Skip accessories completely
+      let isAccessory = false;
+      for (const word of excludeWords) {
+        if (title.includes(word)) {
+          isAccessory = true;
+          break;
+        }
+      }
+      if (isAccessory) continue;
+      
+      // Must contain "nike" 
+      if (!title.includes("nike")) score -= 20;
+      
+      // Count matching keywords
+      for (const word of queryWords) {
+        if (title.includes(word)) score += 3;
+      }
+      
+      // Bonus for exact phrase match
+      if (title.includes(query.toLowerCase())) score += 15;
+      
+      // Bonus if it contains "shoe" or "sneaker"
+      if (title.includes("shoe") || title.includes("sneaker") || title.includes("footwear")) score += 2;
+      
+      // Penalty for "boys", "kids", "children", "girl" if not in query
+      if (!query.toLowerCase().includes("boy") && title.includes("boy")) score -= 15;
+      if (!query.toLowerCase().includes("kid") && title.includes("kid")) score -= 15;
+      if (!query.toLowerCase().includes("child") && title.includes("child")) score -= 15;
+      if (!query.toLowerCase().includes("girl") && title.includes("girl")) score -= 15;
+      if (!query.toLowerCase().includes("women") && title.includes("women")) score -= 8;
+      
+      // Prefer items with images and prices
+      if (item.image) score += 1;
+      if (item.price) score += 1;
+      
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = item;
+      }
+    }
+
+    if (!bestMatch || bestScore < 5) {
+      console.log("❌ No suitable Nike product found (insufficient score)");
+      return null;
+    }
+
+    const priceStr = bestMatch.price || "";
+    // Extract numeric price
+    const priceMatch = String(priceStr).match(/[\d,]+/);
+    const price = priceMatch ? parseFloat(priceMatch[0].replace(/,/g, "")) : null;
+
+    console.log(`✅ Found on Nike: ${bestMatch.title} (score: ${bestScore})`);
+
+    return {
+      source: "Nike",
+      title: bestMatch.title,
+      price: price,
+      image: bestMatch.image,
+      link: bestMatch.link,
+      rating: bestMatch.rating,
+      reviews: null
+    };
+
+  } catch (error) {
+    console.error("❌ Nike search error:", error.message);
+    return null;
+  }
+}
+
+/**
+ * Filter products to only include clothing and footwear (NO undergarments or accessories)
+ * Also validates against search query to ensure relevance
+ */
+function isClothingOrFootwear(productName, searchQuery = "") {
+  if (!productName) return false;
+  
+  const text = productName.toLowerCase();
+  const query = searchQuery.toLowerCase();
+  
+  // Always exclude these items regardless of search
+  const alwaysExclude = ["perfume", "fragrance", "deodorant", "cologne", "edt", "edp", "spray", "mist", "scent"];
+  if (alwaysExclude.some(keyword => text.includes(keyword))) {
+    return false;
+  }
+  
+  // Explicitly exclude undergarments
+  const excludeKeywords = ["underwear", "bra", "brief", "panty", "panties", "boxers", "thermal underwear"];
+  if (excludeKeywords.some(keyword => text.includes(keyword))) {
+    return false;
+  }
+  
+  // If searching for shoes/sneakers/jordan, ONLY return footwear
+  const isFootwearSearch = ["shoe", "sneaker", "jordan", "air max", "dunk", "force", "boot", "trainer", "yeezy", "air force", "retro"].some(kw => query.includes(kw));
+  
+  if (isFootwearSearch) {
+    // Must contain footwear-related keywords for shoe searches - be strict!
+    const footwearKeywords = ["shoe", "sneaker", "boot", "trainer", "footwear", "running", "basketball", "athletic", "jordan", "air max", "dunk"];
+    const hasFootwear = footwearKeywords.some(keyword => text.includes(keyword));
+    
+    // Exclude non-footwear items even if they have brand names
+    const nonFootwearItems = ["shirt", "t-shirt", "tshirt", "jacket", "hoodie", "cap", "hat", "bag", "wallet", "watch", "belt", "pants", "shorts", "socks"];
+    const isNonFootwear = nonFootwearItems.some(keyword => text.includes(keyword));
+    
+    // Only return if it has footwear keyword AND doesn't have non-footwear keywords
+    return hasFootwear && !isNonFootwear;
+  }
+  
+  const fashionKeywords = [
+    // Footwear
+    "shoe", "sneaker", "boot", "sandal", "slipper", "heel", "loafer", 
+    "trainer", "running shoe", "casual shoe", "formal shoe", "sports shoe", "athletic shoe",
+    
+    // Upper body
+    "shirt", "t-shirt", "tshirt", "top", "blouse", "sweater", "sweatshirt", "hoodie", 
+    "jacket", "coat", "blazer", "cardigan", "pullover", "polo", "vest",
+    
+    // Lower body
+    "pant", "pants", "jeans", "jean", "shorts", "short", "skirt", "leggings", "legging", 
+    "dress", "dhoti", "saree", "kurta", "trouser", "trousers",
+    
+    // All major brands
+    "nike", "adidas", "puma", "reebok", "new balance", "converse", "vans", "timberland", 
+    "dr martens", "gucci", "louis vuitton", "lv", "prada", "dior", "chanel", 
+    "tommy hilfiger", "calvin klein", "hugo boss", "lacoste", "zara", "h&m", 
+    "levi's", "levis", "diesel", "armani", "ralph lauren", "skechers",
+    
+    // General fashion
+    "apparel", "wear", "clothing", "clothes", "outfit", "fashion"
+  ];
+  
+  return fashionKeywords.some(keyword => text.includes(keyword));
+}
+
+/**
  * Fetch Amazon results from SerpApi
  */
 async function fetchAmazonResults(query) {
   try {
+    if (!SERPAPI_KEY) {
+      console.log("⚠️ SERPAPI_KEY not set; skipping Amazon fetch");
+      return [];
+    }
+
     const url = "https://serpapi.com/search";
     const params = {
       engine: "amazon",
@@ -884,6 +1360,11 @@ async function fetchAmazonResults(query) {
 
     const results = [];
     for (const item of (data.organic_results || []).slice(0, 20)) {
+      // Filter for clothing/footwear only - pass query for context-aware filtering
+      if (!isClothingOrFootwear(item.title, query)) {
+        continue;
+      }
+
       const link = item.link || "";
       const priceData = item.price;
       const price = typeof priceData === "object" ? priceData.raw : priceData;
@@ -924,6 +1405,11 @@ async function fetchAmazonResults(query) {
  */
 async function fetchFlipkartResults(query) {
   try {
+    if (!SERPAPI_KEY) {
+      console.log("⚠️ SERPAPI_KEY not set; skipping Flipkart fetch");
+      return [];
+    }
+
     const url = "https://serpapi.com/search";
     const params = {
       engine: "google_shopping",
@@ -940,6 +1426,11 @@ async function fetchFlipkartResults(query) {
 
     const results = [];
     for (const item of (data.shopping_results || []).slice(0, 20)) {
+      // Filter for clothing/footwear only - pass query for context-aware filtering
+      if (!isClothingOrFootwear(item.title, query)) {
+        continue;
+      }
+
       results.push({
         productName: item.title,
         price: item.price,
@@ -956,6 +1447,57 @@ async function fetchFlipkartResults(query) {
 
   } catch (error) {
     console.error("⚠️ Flipkart fetch error:", error.message);
+    return [];
+  }
+}
+
+/**
+ * Fetch Nike results from SerpApi (Google Shopping)
+ */
+async function fetchNikeResults(query) {
+  try {
+    if (!SERPAPI_KEY) {
+      console.log("⚠️ SERPAPI_KEY not set; skipping Nike fetch");
+      return [];
+    }
+
+    const url = "https://serpapi.com/search";
+    const params = {
+      engine: "google_shopping",
+      api_key: SERPAPI_KEY,
+      q: `nike ${query}`,
+      google_domain: "google.co.in",
+      hl: "en",
+      gl: "in"
+    };
+
+    console.log("📦 Fetching from Nike (Google Shopping)...");
+    const response = await axios.get(url, { params });
+    const data = response.data;
+
+    const results = [];
+    for (const item of (data.shopping_results || []).slice(0, 20)) {
+      // Filter for clothing/footwear only - pass query for context-aware filtering
+      if (!isClothingOrFootwear(item.title, query)) {
+        continue;
+      }
+
+      results.push({
+        productName: item.title,
+        price: item.price,
+        source: "Nike",
+        image: item.thumbnail || "",
+        link: item.product_link || "",
+        rating: item.rating || null,
+        reviews: item.reviews || null
+      });
+    }
+
+    console.log(`✓ Nike: ${results.length} products`);
+    return results;
+
+  } catch (error) {
+    console.error("⚠️ Nike fetch error:", error.message);
     return [];
   }
 }
@@ -1122,11 +1664,7 @@ app.get("/api/wishlist/:userId", async (req, res) => {
     const items = await Wishlist.find({ userId }).sort({ createdAt: -1 });
 
     console.log(`✅ Found ${items.length} items in wishlist`);
-    res.json({
-      userId,
-      count: items.length,
-      items
-    });
+    res.json({ items });  // Wrap in object to match frontend expectation
 
   } catch (error) {
     console.error("❌ Error in /api/wishlist/:userId:", error.message);
@@ -1203,31 +1741,31 @@ app.post("/api/wishlist/price-alert", async (req, res) => {
 });
 
 // ==========================================
-// 3️⃣ AI STYLE BUILDER → PROXY TO PYTHON API
+// 3️⃣ STYLE BUILDER → PROXY TO PYTHON SERVICE
 // ==========================================
 /**
  * GET /api/style-builder/:productId
- * Proxy request to Python AI API for style recommendations
+ * Proxy request to Python service for style recommendations
  */
 app.get("/api/style-builder/:productId", async (req, res) => {
   const productId = req.params.productId;
   const aiApiUrl = `${process.env.AI_API_URL}/api/style-builder/${productId}`;
   
   console.log(`[BACKEND] Style builder request for productId: ${productId}`);
-  console.log(`[BACKEND] Calling AI API: ${aiApiUrl}`);
+  console.log(`[BACKEND] Calling style service: ${aiApiUrl}`);
 
   try {
     const response = await axios.get(aiApiUrl);
-    console.log(`[BACKEND] AI API response status: ${response.status}`);
+    console.log(`[BACKEND] Style service response status: ${response.status}`);
     res.json(response.data);
   } catch (error) {
-    console.error("⚠️ AI API error:", error.message);
+    console.error("⚠️ Style service error:", error.message);
     if (error.response) {
-      console.error(`[BACKEND] AI API error status: ${error.response.status}`);
-      console.error(`[BACKEND] AI API error data:`, error.response.data);
+      console.error(`[BACKEND] Style service error status: ${error.response.status}`);
+      console.error(`[BACKEND] Style service error data:`, error.response.data);
       res.status(error.response.status).json(error.response.data);
     } else {
-      res.status(500).json({ error: "AI service unavailable" });
+      res.status(500).json({ error: "Style service unavailable" });
     }
   }
 });
@@ -1263,7 +1801,14 @@ app.get("/api/search", async (req, res) => {
       .limit(100)
       .toArray();
 
-    res.json(docs);
+    // Normalize field names: imageUrl -> image, productUrl -> link
+    const normalized = docs.map(doc => ({
+      ...doc,
+      image: doc.image || doc.imageUrl,
+      link: doc.link || doc.productUrl
+    }));
+
+    res.json(normalized);
   } catch (err) {
     console.error("Error in /api/search:", err.message);
     res.status(500).json({ error: err.message });

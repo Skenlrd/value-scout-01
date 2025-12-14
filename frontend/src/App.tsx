@@ -44,14 +44,14 @@ function App() {
     <GoogleOAuthProvider clientId="813492076332-lf68pl7vn7kfe6m53t0i0u55mgrandhe.apps.googleusercontent.com">
       <Router>
         {/* Brand logo + Navbar */}
-        <header className="text-center py-6 bg-gradient-to-br from-[#eaf6f2] to-[#b6c9c3]">
+        <header className="text-center py-6 bg-transparent">
           <BrandLogo size="md" />
         </header>
 
         <Navbar onLogout={handleLogout} isLoggedIn={isLoggedIn} />
 
         {/* Main layout */}
-        <main className="min-h-screen bg-gradient-to-br from-[#eaf6f2] to-[#b6c9c3] pt-[20px]">
+        <main className="min-h-screen bg-transparent pt-[20px]">
           <Routes>
             {/* Public routes */}
             <Route path="/" element={<Home />} />
@@ -59,7 +59,7 @@ function App() {
             <Route path="/wishlist" element={<Wishlist />} />
             <Route path="/verify-email" element={<VerifyEmail />} />
 
-            {/* ✅ AI Style Builder Route */}
+            {/* Style Builder Route */}
             <Route path="/style-builder" element={<StyleBuilderSearchPage />} />
 
             {/* Auth */}

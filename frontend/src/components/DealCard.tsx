@@ -97,13 +97,13 @@ const DealCard = ({
 
         {/* Content Section */}
         <div className="p-4 flex-grow flex flex-col">
-          <h3 className="font-medium text-foreground mb-2 line-clamp-2 group-hover:text-gray-700">{name}</h3>
-          <p className="text-lg font-bold text-black mb-2">{currentPrice}</p>
+          <h3 className="font-medium text-foreground text-base mb-2 line-clamp-2 group-hover:text-gray-700">{name}</h3>
+          <p className="text-xl font-bold text-black mb-2">{currentPrice}</p>
           <div className="flex items-center gap-1 text-green-600 mt-auto">
             <ArrowDown className="w-4 h-4" />
             <span className="text-sm font-medium">{priceDrop}</span>
           </div>
-          {source && <span className="text-xs text-gray-500 mt-2">{source}</span>}
+          {source && <span className="text-sm text-gray-500 mt-2">{source}</span>}
         </div>
       </Card>
     </a>

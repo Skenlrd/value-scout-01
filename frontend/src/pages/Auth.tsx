@@ -139,48 +139,16 @@ const Auth = ({ onLogin, initialMode = 'login' }: AuthProps) => {
     ux_mode: "popup",
   });
 
-  // Apple OAuth handler
-  const handleAppleLogin = async () => {
-    try {
-      // In production, use Apple's official SDK
-      // For now, prompt for email
-      const email = prompt("Enter your email for Apple login:");
-      if (!email) return;
-
-      const response = await fetch("http://localhost:8000/api/auth/apple", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: email.toLowerCase(),
-          name: email.split("@")[0],
-          appleId: `apple_${Date.now()}` // Placeholder
-        })
-      });
-
-      const data = await response.json();
-      if (response.ok) {
-        localStorage.setItem("user", JSON.stringify(data.user));
-        localStorage.setItem("isLoggedIn", "true");
-        if (onLogin) onLogin();
-        navigate("/");
-      } else {
-        setError(data.error || "Apple login failed");
-      }
-    } catch (err: any) {
-      setError(err.message || "Apple login failed");
-    }
-  };
-
   return (
-    <div className="min-h-screen flex flex-col items-center justify-start pt-24 p-4 bg-gradient-to-br from-[#eaf6f2] to-[#b6c9c3]">
+    <div className="min-h-screen flex flex-col items-center justify-start pt-28 md:pt-32 p-4 bg-gradient-to-br from-[#eaf6f2] to-[#b6c9c3]">
       <div
         className="w-full max-w-md backdrop-blur-xl bg-white/30 border border-white/40 rounded-3xl shadow-2xl p-8 transition-smooth"
         style={{ minHeight: isSignup ? "580px" : "500px" }} 
       >
         {registrationSuccess ? (
           <div className="text-center">
-            <div className="text-5xl mb-4">📧</div>
-            <h2 className="text-3xl font-bold mb-2 text-gray-900">Check Your Email!</h2>
+            <div className="text-4xl mb-4">📧</div>
+            <h2 className="text-2xl font-bold mb-2 text-gray-900">Check Your Email!</h2>
             <p className="text-gray-700 mb-4">
               We've sent a verification link to <strong>{email}</strong>
             </p>
@@ -302,16 +270,6 @@ const Auth = ({ onLogin, initialMode = 'login' }: AuthProps) => {
                   <path fill="#34A853" d="M272.1 544.3c73.8 0 135.8-24.4 181-66.5l-88.3-68.1c-24.5 16.5-55.9 26-92.7 26-71 0-131.1-47.9-152.6-112.1H29.9v70.2c45 89.5 137.3 150.5 242.2 150.5z"/>
                   <path fill="#FBBC05" d="M119.5 323.6c-10.2-30.2-10.2-62.8 0-93l.1-70.2H29.9c-44.9 89.5-44.9 196.6 0 286.1l89.6-70.7z"/>
                   <path fill="#EA4335" d="M272.1 107.7c39.9-.6 78.1 14.9 107.4 43.4l80-80C414 24.6 344.3-.8 272.1 0 167.2 0 74.9 61 29.9 150.5l89.6 70.2C141 155.6 201.1 107.7 272.1 107.7z"/>
-                </svg>
-              </button>
-              <button 
-                type="button" 
-                onClick={handleAppleLogin}
-                className="w-12 h-12 bg-white/50 hover:bg-white/70 rounded-full flex items-center justify-center transition-all backdrop-blur-sm border border-white/40"
-                title="Login with Apple"
-              >
-                <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 text-gray-900">
-                  <path d="M17.569 12.503c-.034-2.995 2.445-4.438 2.556-4.51-1.398-2.042-3.57-2.323-4.338-2.349-1.828-.19-3.585 1.089-4.514 1.089-.948 0-2.376-1.07-3.906-1.039-1.998.031-3.85 1.177-4.877 2.979-2.096 3.636-.536 9.004 1.482 11.95 1.005 1.442 2.185 3.059 3.715 3.002 1.492-.062 2.056-.953 3.86-.953 1.785 0 2.311.953 3.888.918 1.612-.025 2.616-1.464 3.582-2.919 1.142-1.65 1.608-3.254 1.632-3.337-.036-.015-3.127-1.197-3.16-4.751zm-2.895-8.546c.816-1.002 1.366-2.373 1.216-3.75-1.176.048-2.644.795-3.497 1.776-.765.877-1.434 2.295-1.255 3.633 1.328.103 2.685-.669 3.536-1.659z"/>
                 </svg>
               </button>
             </div>
